@@ -53,6 +53,17 @@ npm run dev
 
 存檔後重啟 `npm run dev`，行事曆會顯示該日曆的已預約時段，預約成功後也會在該日曆建立新活動。
 
+## 部署
+
+此專案含 API routes，建議使用 **Vercel** 部署（原生支援 Next.js）：
+
+1. 前往 [vercel.com](https://vercel.com)，用 GitHub 登入  
+2. **Add New** → **Project** → 選擇 `studio-booking`  
+3. 在 **Environment Variables** 新增 `GOOGLE_CALENDAR_ID` 和 `GOOGLE_SERVICE_ACCOUNT_JSON`  
+4. 點 **Deploy**  
+
+> Cloudflare Pages 需額外設定才能跑 Next.js API routes，容易出現 404，建議改用 Vercel。
+
 ## 自訂內容
 
 - **空間圖片**：編輯 `src/app/page.tsx` 中的 `SPACE_IMAGES` 陣列，改為您的圖片 URL。  
