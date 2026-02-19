@@ -1,0 +1,4 @@
+# Cloudflare Pages / Workers 設定
+# 啟用 Node.js 相容性以支援 googleapis 等套件
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
