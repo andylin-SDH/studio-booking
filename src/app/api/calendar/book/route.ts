@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createCalendarEvent } from "@/lib/google-calendar";
 
-export const runtime = "edge";
-
 export async function POST(request: NextRequest) {
   let body: {
     start?: string;
