@@ -30,3 +30,4 @@ yarn-error.log*
 # Google credentials (切勿提交到 Git)
 *google*credentials*.json
 winter-wonder-*.json
+gen-lang-client-*.json

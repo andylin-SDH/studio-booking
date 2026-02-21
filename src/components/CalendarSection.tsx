@@ -15,8 +15,6 @@ import {
   isSameDay,
   isToday,
   isBefore,
-  setHours,
-  setMinutes,
   parseISO,
 } from "date-fns";
 import { zhTW } from "date-fns/locale";
@@ -29,12 +27,14 @@ const MAX_BOOKING_MONTHS_AHEAD = 1;
 type CalendarEvent = { start: string; end: string };
 
 interface CalendarSectionProps {
+  studio: "big" | "small";
   selectedDate: Date | null;
   onSelectDate: (date: Date | null) => void;
-  onSelectSlot: (start: Date, durationMinutes: number) => void;
+  onSelectSlot: (start: Date, end: Date) => void;
 }
 
 export function CalendarSection({
+  studio,
   selectedDate,
   onSelectDate,
   onSelectSlot,
@@ -43,6 +43,14 @@ export function CalendarSection({
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // 預約成功後重新載入行事曆，避免同一時段重複預約
+  useEffect(() => {
+    const onBookingSuccess = () => setRefreshTrigger((n) => n + 1);
+    window.addEventListener("booking-success", onBookingSuccess);
+    return () => window.removeEventListener("booking-success", onBookingSuccess);
+  }, []);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -63,21 +71,37 @@ export function CalendarSection({
   // 取得當月行事曆事件（使用穩定字串避免重複請求）
   const monthKey = format(currentMonth, "yyyy-MM");
   useEffect(() => {
+    let cancelled = false;
     const from = format(monthStart, "yyyy-MM-dd");
     const to = format(addDays(monthEnd, 1), "yyyy-MM-dd");
     setLoading(true);
     setError(null);
-    fetch(`/api/calendar/events?from=${from}&to=${to}`)
-      .then((res) => {
-        if (!res.ok) throw new Error("無法載入行事曆");
-        return res.json();
+    fetch(`/api/calendar/events?from=${from}&to=${to}&studio=${studio}`, {
+      cache: "no-store",
+    })
+      .then(async (res) => {
+        const data = (await res.json()) as {
+          events?: { start: string; end: string }[];
+          error?: string;
+        };
+        if (!res.ok) {
+          throw new Error(data.error || "無法載入行事曆");
+        }
+        return data;
       })
-      .then((data: { events?: { start: string; end: string }[] }) => {
-        setEvents(data.events || []);
+      .then((data) => {
+        if (!cancelled) setEvents(data.events || []);
       })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [monthKey]); // 僅在切換月份時重新取得
+      .catch((e) => {
+        if (!cancelled) setError(e.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [monthKey, studio, refreshTrigger]); // 切換月份、錄音室或預約成功後重新取得
 
   const maxDate = useMemo(
     () => addMonths(new Date(), MAX_BOOKING_MONTHS_AHEAD),
@@ -104,14 +128,33 @@ export function CalendarSection({
         slotStart < range.end && slotEnd > range.start
     );
 
-  const timeSlots = useMemo(() => {
-    const slots: Date[] = [];
-    for (let h = DAY_START_HOUR; h < DAY_END_HOUR; h++) {
-      slots.push(setMinutes(setHours(new Date(), h), 0));
-      slots.push(setMinutes(setHours(new Date(), h), 30));
+  const timeOptions = useMemo(() => {
+    const opts: string[] = [];
+    for (let h = DAY_START_HOUR; h <= DAY_END_HOUR; h++) {
+      opts.push(`${String(h).padStart(2, "0")}:00`);
+      if (h < DAY_END_HOUR) opts.push(`${String(h).padStart(2, "0")}:30`);
     }
-    return slots;
+    return opts;
   }, []);
+
+  const [startTime, setStartTime] = useState<string>("");
+  const [endTime, setEndTime] = useState<string>("");
+
+  const handleStartChange = (val: string) => {
+    setStartTime(val);
+    if (endTime && val >= endTime) setEndTime("");
+  };
+
+  const handleDateChange = (date: Date | null) => {
+    setStartTime("");
+    setEndTime("");
+    onSelectDate(date);
+  };
+
+  // 切換錄音室時清空已選日期
+  useEffect(() => {
+    onSelectDate(null);
+  }, [studio]);
 
   if (error) {
     return (
@@ -175,7 +218,7 @@ export function CalendarSection({
                   key={day.toISOString()}
                   type="button"
                   disabled={!selectable}
-                  onClick={() => onSelectDate(selectable ? day : null)}
+                  onClick={() => handleDateChange(selectable ? day : null)}
                   className={`min-h-[44px] border-b border-r border-slate-100 p-2 text-left text-sm transition
                     ${inMonth ? "text-slate-800" : "text-slate-300"}
                     ${!selectable ? "cursor-not-allowed opacity-50" : "hover:bg-slate-50"}
@@ -190,7 +233,7 @@ export function CalendarSection({
         ))}
       </div>
 
-      {/* 已選日期：顯示時段（30 分鐘 / 1 小時） */}
+      {/* 已選日期：開始 / 結束時間下拉選單 */}
       {selectedDate && (
         <div className="rounded-xl border border-slate-200 bg-white p-6">
           <h3 className="mb-4 font-semibold text-slate-800">
@@ -200,48 +243,85 @@ export function CalendarSection({
             <p className="text-slate-500">載入中…</p>
           ) : (
             <div className="space-y-4">
-              <p className="text-sm text-slate-600">
-                可選 30 分鐘或 1 小時，點選後將進入「立即預約」。
-              </p>
-              <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                {timeSlots.map((baseTime) => {
-                  const slotStart = new Date(selectedDate);
-                  slotStart.setHours(baseTime.getHours(), baseTime.getMinutes(), 0, 0);
-                  const slotEnd30 = new Date(slotStart.getTime() + 30 * 60 * 1000);
-                  const slotEnd60 = new Date(slotStart.getTime() + 60 * 60 * 1000);
-                  const busy30 = isSlotBusy(slotStart, slotEnd30);
-                  const busy60 = isSlotBusy(slotStart, slotEnd60);
-                  const past = slotStart <= new Date();
-                  return (
-                    <div key={slotStart.toISOString()} className="flex flex-col gap-1">
-                      <span className="text-xs text-slate-500">
-                        {format(slotStart, "HH:mm")}
-                      </span>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          disabled={past || busy30}
-                          onClick={() => onSelectSlot(slotStart, 30)}
-                          className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700"
-                        >
-                          30 分鐘
-                        </button>
-                        <button
-                          type="button"
-                          disabled={past || busy60}
-                          onClick={() => onSelectSlot(slotStart, 60)}
-                          className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700"
-                        >
-                          1 小時
-                        </button>
-                      </div>
-                      {(busy30 || busy60) && (
-                        <span className="text-xs text-amber-600">該時段已有預約</span>
-                      )}
-                    </div>
-                  );
-                })}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">開始</label>
+                  <select
+                    value={startTime}
+                    onChange={(e) => handleStartChange(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  >
+                    <option value="">開始時間</option>
+                    {timeOptions.map((t) => {
+                      const [h, m] = t.split(":").map(Number);
+                      const slotStart = new Date(selectedDate);
+                      slotStart.setHours(h, m, 0, 0);
+                      const slotEnd = new Date(slotStart.getTime() + 30 * 60 * 1000);
+                      const past = slotStart <= new Date();
+                      const busy = isSlotBusy(slotStart, slotEnd);
+                      const disabled = past || busy;
+                      return (
+                        <option key={t} value={t} disabled={disabled}>
+                          {t} {busy && "（已預約）"}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">結束</label>
+                  <select
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    disabled={!startTime}
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-50"
+                  >
+                    <option value="">結束時間</option>
+                    {timeOptions
+                      .filter((t) => startTime && t > startTime)
+                      .map((t) => {
+                        const [h, m] = t.split(":").map(Number);
+                        const [sh, sm] = startTime.split(":").map(Number);
+                        const slotStart = new Date(selectedDate);
+                        slotStart.setHours(sh, sm, 0, 0);
+                        const slotEnd = new Date(selectedDate);
+                        slotEnd.setHours(h, m, 0, 0);
+                        const busy = isSlotBusy(slotStart, slotEnd);
+                        return (
+                          <option key={t} value={t} disabled={busy}>
+                            {t} {busy && "（與已預約重疊）"}
+                          </option>
+                        );
+                      })}
+                  </select>
+                </div>
               </div>
+              <button
+                type="button"
+                disabled={!startTime || !endTime || (() => {
+                  if (!startTime || !endTime) return true;
+                  const [sh, sm] = startTime.split(":").map(Number);
+                  const [eh, em] = endTime.split(":").map(Number);
+                  const slotStart = new Date(selectedDate);
+                  slotStart.setHours(sh, sm, 0, 0);
+                  const slotEnd = new Date(selectedDate);
+                  slotEnd.setHours(eh, em, 0, 0);
+                  return isSlotBusy(slotStart, slotEnd);
+                })()}
+                onClick={() => {
+                  if (!startTime || !endTime) return;
+                  const [sh, sm] = startTime.split(":").map(Number);
+                  const [eh, em] = endTime.split(":").map(Number);
+                  const start = new Date(selectedDate);
+                  start.setHours(sh, sm, 0, 0);
+                  const end = new Date(selectedDate);
+                  end.setHours(eh, em, 0, 0);
+                  if (!isSlotBusy(start, end)) onSelectSlot(start, end);
+                }}
+                className="w-full rounded-lg bg-sky-600 px-4 py-2.5 font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                立即預約
+              </button>
             </div>
           )}
         </div>

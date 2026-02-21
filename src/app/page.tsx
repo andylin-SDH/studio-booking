@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { CalendarSection } from "@/components/CalendarSection";
 import { BookingModal } from "@/components/BookingModal";
-import { addMinutes } from "date-fns";
+import { STUDIOS, type StudioId } from "@/lib/studios";
 
 // 空間介紹圖片（使用 placeholder，您可替換為實際圖片 URL）
 const SPACE_IMAGES = [
@@ -13,18 +13,16 @@ const SPACE_IMAGES = [
 ];
 
 export default function Home() {
+  const [studio, setStudio] = useState<StudioId>("big");
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<{ start: Date; end: Date; durationMinutes: number } | null>(null);
   const [showBookingModal, setShowBookingModal] = useState(false);
 
-  const handleSelectSlot = useCallback(
-    (start: Date, durationMinutes: number) => {
-      const end = addMinutes(start, durationMinutes);
-      setSelectedSlot({ start, end, durationMinutes });
-      setShowBookingModal(true);
-    },
-    []
-  );
+  const handleSelectSlot = useCallback((start: Date, end: Date) => {
+    const durationMinutes = Math.round((end.getTime() - start.getTime()) / 60000);
+    setSelectedSlot({ start, end, durationMinutes });
+    setShowBookingModal(true);
+  }, []);
 
   const handleCloseBooking = useCallback(() => {
     setShowBookingModal(false);
@@ -35,8 +33,13 @@ export default function Home() {
     setShowBookingModal(false);
     setSelectedSlot(null);
     setSelectedDate(null);
-    // 可在此觸發重新取得行事曆
     window.dispatchEvent(new CustomEvent("booking-success"));
+  }, []);
+
+  const handleStudioChange = useCallback((id: StudioId) => {
+    setStudio(id);
+    setSelectedDate(null);
+    setSelectedSlot(null);
   }, []);
 
   return (
@@ -44,7 +47,7 @@ export default function Home() {
       {/* 導覽 */}
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-          <span className="text-lg font-semibold text-slate-800">聊心室 · 錄音室預約</span>
+          <span className="text-lg font-semibold text-slate-800">盛德好錄音室 · 預約</span>
           <nav className="flex gap-6 text-sm text-slate-600">
             <a href="#space" className="hover:text-sky-600">空間介紹</a>
             <a href="#venue" className="hover:text-sky-600">場地介紹</a>
@@ -119,11 +122,28 @@ export default function Home() {
 
         {/* 4 & 5 & 6. 行事曆 + 時段選擇 + 立即預約 */}
         <section id="calendar" className="mb-20">
-          <h2 className="mb-6 text-2xl font-bold text-slate-800">空間使用狀況 · 選擇預約時段</h2>
+          <h2 className="mb-2 text-2xl font-bold text-slate-800">空間使用狀況 · 選擇預約時段</h2>
+          <div className="mb-6 flex gap-2">
+            {(Object.keys(STUDIOS) as StudioId[]).map((id) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => handleStudioChange(id)}
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                  studio === id
+                    ? "bg-sky-600 text-white"
+                    : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                {STUDIOS[id]}
+              </button>
+            ))}
+          </div>
           <p className="mb-6 text-slate-600">
-            請先選擇日期，再選擇 1 小時或 30 分鐘的時段，並點選「立即預約」。
+            請先選擇錄音室，再選擇日期與時段，並點選「立即預約」。
           </p>
           <CalendarSection
+            studio={studio}
             selectedDate={selectedDate}
             onSelectDate={setSelectedDate}
             onSelectSlot={handleSelectSlot}
@@ -134,6 +154,7 @@ export default function Home() {
       {/* 立即預約彈窗 */}
       {showBookingModal && selectedSlot && (
         <BookingModal
+          studio={studio}
           start={selectedSlot.start}
           end={selectedSlot.end}
           durationMinutes={selectedSlot.durationMinutes}
@@ -144,7 +165,7 @@ export default function Home() {
 
       <footer className="border-t border-slate-200 bg-white py-8">
         <div className="mx-auto max-w-6xl px-4 text-center text-sm text-slate-500">
-          錄音室預約系統 · 時段以 Google 行事曆為準
+          盛德好錄音室預約系統 · 時段以 Google 行事曆為準
         </div>
       </footer>
     </div>

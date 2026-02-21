@@ -1,17 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCalendarEvents } from "@/lib/google-calendar";
+import type { StudioId } from "@/lib/studios";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   const from = request.nextUrl.searchParams.get("from");
   const to = request.nextUrl.searchParams.get("to");
+  const studio = (request.nextUrl.searchParams.get("studio") || "big") as StudioId;
   if (!from || !to) {
     return NextResponse.json(
       { error: "請提供 from 與 to 參數 (yyyy-MM-dd)" },
       { status: 400 }
     );
   }
+  if (studio !== "big" && studio !== "small") {
+    return NextResponse.json({ error: "無效的 studio 參數" }, { status: 400 });
+  }
   try {
-    const events = await getCalendarEvents(from, to);
+    const events = await getCalendarEvents(from, to, studio);
     return NextResponse.json({ events });
   } catch (e) {
     console.error("Calendar events error:", e);

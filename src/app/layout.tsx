@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "錄音室預約 | 聊心室",
-  description: "專業錄音室空間預約，選擇您的時段立即預約",
+  title: "盛德好錄音室 | 預約",
+  description: "盛德好錄音室大間、小間預約，選擇您的時段立即預約",
 };
 
 export default function RootLayout({

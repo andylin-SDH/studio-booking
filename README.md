@@ -1,6 +1,6 @@
-# 錄音室預約介面
+# 盛德好錄音室預約系統
 
-仿 [MicVision 聊心室](https://micvision.studio/product/%E8%81%8A%E5%BF%83%E5%AE%A4-%E6%9C%80%E5%A4%9A2%E4%BA%BA%E9%8C%84%E9%9F%B3/) 的錄音室預約網站，包含：
+支援兩間錄音室（大間、小間），各自對應獨立 Google 行事曆，KOL 折扣碼共用同一份試算表。包含：
 
 1. **空間介紹**：圖片區塊  
 2. **場地介紹**：文字說明  
@@ -31,25 +31,27 @@ npm run dev
 1. **Google Cloud Console**  
    - 前往 [Google Cloud Console](https://console.cloud.google.com/)  
    - 建立專案（或選既有專案）  
-   - 啟用 **Google Calendar API**（「API 和服務」→「程式庫」→ 搜尋 Calendar → 啟用）  
+   - 啟用 **Google Calendar API** 與 **Google Sheets API**（「API 和服務」→「程式庫」→ 搜尋後啟用）  
 
 2. **服務帳戶**  
    - 「API 和服務」→「憑證」→「建立憑證」→「服務帳戶」  
    - 建立後進入該服務帳戶 →「金鑰」→「新增金鑰」→「JSON」  
    - 下載 JSON 檔案  
 
-3. **共用行事曆**  
-   - 開啟您要用來管理「錄音室預約」的 Google 行事曆  
-   - 設定 → 與特定使用者共用 → 新增 **服務帳戶的 email**（JSON 裡的 `client_email`）  
-   - 權限設為「變更活動的權限」或「管理共用設定」  
+3. **共用行事曆與試算表**  
+   - **大間**行事曆 → 與 `cal1-574@winter-wonder-487904-d7.iam.gserviceaccount.com` 共用（變更活動權限）  
+   - **小間**行事曆 → 與 `cal-small@gen-lang-client-0270894688.iam.gserviceaccount.com` 共用（變更活動權限）  
+   - KOL 折扣碼試算表 → 與**大間**的服務帳戶共用（編輯權限）  
 
 4. **環境變數**  
    - 複製 `.env.example` 為 `.env.local`  
    - 填寫：  
-     - `GOOGLE_CALENDAR_ID`：行事曆 ID（例如 `primary` 或 `xxxx@group.calendar.google.com`）  
-     - 擇一：  
-       - **GOOGLE_SERVICE_ACCOUNT_JSON**：把整個 JSON 壓成**單行**貼上（適合 Vercel 等雲端部署）  
-       - **GOOGLE_APPLICATION_CREDENTIALS**：本機開發可填 JSON 檔案路徑，例如 `./google-credentials.json`  
+     - `GOOGLE_CALENDAR_BIG`：大間錄音室行事曆 ID  
+     - `GOOGLE_CALENDAR_SMALL`：小間錄音室行事曆 ID  
+     - `GOOGLE_APPLICATION_CREDENTIALS_BIG`：大間服務帳戶 JSON 檔案路徑  
+     - `GOOGLE_APPLICATION_CREDENTIALS_SMALL`：小間服務帳戶 JSON 檔案路徑  
+     - `GOOGLE_APPLICATION_CREDENTIALS`：試算表用（可與 BIG 相同）  
+   - **GOOGLE_SHEET_ID**（KOL 折扣碼）：試算表網址中 `spreadsheets/d/` 後的那串 ID  
 
 存檔後重啟 `npm run dev`，行事曆會顯示該日曆的已預約時段，預約成功後也會在該日曆建立新活動。
 
@@ -59,10 +61,25 @@ npm run dev
 
 1. 前往 [vercel.com](https://vercel.com)，用 GitHub 登入  
 2. **Add New** → **Project** → 選擇 `studio-booking`  
-3. 在 **Environment Variables** 新增 `GOOGLE_CALENDAR_ID` 和 `GOOGLE_SERVICE_ACCOUNT_JSON`  
+3. 在 **Environment Variables** 新增 `GOOGLE_CALENDAR_ID`、`GOOGLE_SERVICE_ACCOUNT_JSON`、`GOOGLE_SHEET_ID`  
 4. 點 **Deploy**  
 
 > Cloudflare Pages 需額外設定才能跑 Next.js API routes，容易出現 404，建議改用 Vercel。
+
+## KOL 折扣碼
+
+試算表需有兩個工作表（名稱須完全一致）：
+
+| 工作表 | 欄位（第 1 列為標題） | 單位 |
+|--------|------------------------|------|
+| **KOL名單** | 姓名 \| 折扣碼 \| 每月時數 | 每月時數填「小時」 |
+| **使用記錄** | 折扣碼 \| 使用日期 \| 使用時數 \| 預約摘要 \| 大小間 | 使用時數、大小間由系統寫入 |
+
+系統**全程以小時計算**。預約時填寫折扣碼、點「驗證」，顯示本月剩餘額度。預約成功後會自動寫入使用記錄（含大小間欄位，值為「大間」或「小間」）。
+
+若既有使用記錄僅有 4 欄，請在試算表中新增第 5 欄標題「大小間」。
+
+若工作表名稱不同，可設 `GOOGLE_SHEET_KOL_SHEET`、`GOOGLE_SHEET_USAGE_SHEET` 覆寫。
 
 ## 自訂內容
 

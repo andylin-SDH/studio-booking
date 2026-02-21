@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createCalendarEvent } from "@/lib/google-calendar";
+import {
+  getKolByCode,
+  getMonthlyUsage,
+  addUsageRecord,
+} from "@/lib/google-sheet";
 
 export async function POST(request: NextRequest) {
   let body: {
@@ -9,26 +14,77 @@ export async function POST(request: NextRequest) {
     name?: string;
     contact?: string;
     note?: string;
+    discountCode?: string;
+    studio?: string;
   };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "無效的請求內容" }, { status: 400 });
   }
-  const { start, end, name, contact, note } = body;
+  const { start, end, name, contact, note, discountCode, studio } = body;
+  const studioId = (studio === "small" ? "small" : "big") as import("@/lib/studios").StudioId;
   if (!start || !end || !name || !contact) {
     return NextResponse.json(
       { error: "請提供 start、end、name、contact" },
       { status: 400 }
     );
   }
+  const durationHours = (body.durationMinutes || 0) / 60;
+
+  // 若有折扣碼，驗證額度
+  if (discountCode?.trim()) {
+    try {
+      const kol = await getKolByCode(discountCode.trim());
+      if (!kol) {
+        return NextResponse.json(
+          { error: "折扣碼無效" },
+          { status: 400 }
+        );
+      }
+      const now = new Date();
+      const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const usedThisMonth = await getMonthlyUsage(discountCode.trim(), yearMonth);
+      const remaining = kol.hoursPerMonth - usedThisMonth;
+      if (remaining < durationHours) {
+        const paidHours = durationHours - remaining;
+        return NextResponse.json(
+          {
+            error: `本月免費額度不足。剩餘 ${remaining.toFixed(1)} 小時，本次需 ${durationHours.toFixed(1)} 小時，超出 ${paidHours.toFixed(1)} 小時需付費（付費功能尚未啟用）`,
+          },
+          { status: 400 }
+        );
+      }
+    } catch (e) {
+      console.error("Discount check error:", e);
+      return NextResponse.json(
+        { error: "折扣碼驗證失敗" },
+        { status: 500 }
+      );
+    }
+  }
+
   try {
-    await createCalendarEvent({
-      start,
-      end,
-      summary: `[預約] ${name}`,
-      description: `聯絡方式：${contact}${note ? `\n備註：${note}` : ""}`,
-    });
+    const summary = `[預約] ${name}`;
+    const description = `聯絡方式：${contact}${note ? `\n備註：${note}` : ""}${discountCode?.trim() ? `\n折扣碼：${discountCode.trim()}` : ""}`;
+
+    await createCalendarEvent(
+      { start, end, summary, description },
+      studioId
+    );
+
+    // 若有折扣碼，寫入使用記錄（含大小間）
+    if (discountCode?.trim()) {
+      const dateStr = new Date(start).toISOString().slice(0, 10);
+      await addUsageRecord(
+        discountCode.trim(),
+        dateStr,
+        durationHours,
+        `${name} ${dateStr}`,
+        studioId
+      );
+    }
+
     return NextResponse.json({ success: true });
   } catch (e) {
     console.error("Calendar book error:", e);

@@ -11,33 +11,60 @@
 
 import { google } from "googleapis";
 
-function getCalendarClient() {
-  const calendarId = process.env.GOOGLE_CALENDAR_ID || "primary";
-  let credentials: object | null = null;
+import type { StudioId } from "./studios";
 
-  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+function getCalendarId(studio: StudioId): string {
+  const id =
+    studio === "big"
+      ? process.env.GOOGLE_CALENDAR_BIG
+      : process.env.GOOGLE_CALENDAR_SMALL;
+  return id || process.env.GOOGLE_CALENDAR_ID || "primary";
+}
+
+function loadCredentialsFromEnv(
+  jsonEnv: string | undefined,
+  pathEnv: string | undefined,
+  fallbackPath: string | undefined
+): object | null {
+  if (jsonEnv) {
     try {
-      credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON) as object;
+      return JSON.parse(jsonEnv) as object;
     } catch {
       throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON 格式錯誤");
     }
   }
-
-  if (!credentials && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    const fs = require("fs");
-    const pathModule = require("path");
-    const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-    const resolvedPath = pathModule.isAbsolute(credPath)
-      ? credPath
-      : pathModule.resolve(process.cwd(), credPath);
-    if (fs.existsSync(resolvedPath)) {
-      credentials = JSON.parse(fs.readFileSync(resolvedPath, "utf8")) as object;
-    }
+  const credPath =
+    pathEnv || fallbackPath || process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (!credPath) return null;
+  const fs = require("fs");
+  const pathModule = require("path");
+  const resolvedPath = pathModule.isAbsolute(credPath)
+    ? credPath
+    : pathModule.resolve(process.cwd(), credPath);
+  if (fs.existsSync(resolvedPath)) {
+    return JSON.parse(fs.readFileSync(resolvedPath, "utf8")) as object;
   }
+  return null;
+}
+
+function getCalendarClient(studio: StudioId) {
+  const calendarId = getCalendarId(studio);
+  const credentials =
+    studio === "big"
+      ? loadCredentialsFromEnv(
+          process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BIG,
+          process.env.GOOGLE_APPLICATION_CREDENTIALS_BIG,
+          process.env.GOOGLE_APPLICATION_CREDENTIALS
+        )
+      : loadCredentialsFromEnv(
+          process.env.GOOGLE_SERVICE_ACCOUNT_JSON_SMALL,
+          process.env.GOOGLE_APPLICATION_CREDENTIALS_SMALL,
+          process.env.GOOGLE_APPLICATION_CREDENTIALS
+        );
 
   if (!credentials) {
     throw new Error(
-      "未設定 Google 行事曆憑證。請設定 GOOGLE_SERVICE_ACCOUNT_JSON 或 GOOGLE_APPLICATION_CREDENTIALS，見 README。"
+      `未設定 Google 行事曆憑證（${studio === "big" ? "大間" : "小間"}）。請設定 GOOGLE_APPLICATION_CREDENTIALS_BIG / GOOGLE_APPLICATION_CREDENTIALS_SMALL 或共用 GOOGLE_APPLICATION_CREDENTIALS，見 README。`
     );
   }
 
@@ -62,9 +89,10 @@ export interface CalendarEventInput {
  */
 export async function getCalendarEvents(
   from: string,
-  to: string
+  to: string,
+  studio: StudioId = "big"
 ): Promise<{ start: string; end: string }[]> {
-  const { calendar, calendarId } = getCalendarClient();
+  const { calendar, calendarId } = getCalendarClient(studio);
   const timeMin = new Date(from + "T00:00:00+08:00").toISOString();
   const timeMax = new Date(to + "T23:59:59.999+08:00").toISOString();
 
@@ -98,8 +126,11 @@ export async function getCalendarEvents(
 /**
  * 建立一筆預約事件到 Google 行事曆
  */
-export async function createCalendarEvent(input: CalendarEventInput): Promise<void> {
-  const { calendar, calendarId } = getCalendarClient();
+export async function createCalendarEvent(
+  input: CalendarEventInput,
+  studio: StudioId = "big"
+): Promise<void> {
+  const { calendar, calendarId } = getCalendarClient(studio);
   await calendar.events.insert({
     calendarId,
     requestBody: {
