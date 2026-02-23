@@ -46,7 +46,7 @@ function renderResultPage(status: string, orderId: string, origin?: string) {
 </html>`;
 }
 
-/** 處理綠界 OrderResultURL 的 POST 導轉 */
+/** 處理綠界 OrderResultURL 的 POST：直接回傳結果頁，不重導向（避免 Vercel 重導向迴圈） */
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const params: Record<string, string> = {};
@@ -54,20 +54,17 @@ export async function POST(request: NextRequest) {
     params[key] = typeof val === "string" ? val : val.toString();
   });
 
-  // 使用請求的 origin 避免 baseUrl 與實際網域不同造成重導向迴圈
   const url = new URL(request.url);
-  const origin = url.origin;
   const orderId = params["MerchantTradeNo"] || "";
   const rtnCode = params["RtnCode"];
-  const status = rtnCode === "1" ? "success" : "fail";
+  const status = verifyCheckMacValue(params)
+    ? (rtnCode === "1" ? "success" : "fail")
+    : "error";
 
-  if (!verifyCheckMacValue(params)) {
-    return NextResponse.redirect(`${origin}/pay/result?status=error`);
-  }
-
-  return NextResponse.redirect(
-    `${origin}/pay/result?orderId=${encodeURIComponent(orderId)}&status=${status}`
-  );
+  const html = renderResultPage(status, orderId, url.origin);
+  return new NextResponse(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
 }
 
 /** 顯示付款結果頁 */
