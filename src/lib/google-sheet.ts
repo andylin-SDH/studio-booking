@@ -10,7 +10,8 @@ function getAuth() {
   let credentials: object | null = null;
   const jsonEnv =
     process.env.GOOGLE_SERVICE_ACCOUNT_JSON_SHEETS ||
-    process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON ||
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BIG;
   if (jsonEnv) {
     try {
       credentials = JSON.parse(jsonEnv) as object;
@@ -189,10 +190,11 @@ export async function addPendingOrder(order: PendingOrder): Promise<void> {
   const sheetId = getSheetId();
   const sheetName = await getPendingSheetName();
 
+  // 使用 RAW 保留 start/end 的 ISO 字串格式，供行事曆 API 使用
   await sheets.spreadsheets.values.append({
     spreadsheetId: sheetId,
     range: `${sheetName}!A:M`,
-    valueInputOption: "USER_ENTERED",
+    valueInputOption: "RAW",
     requestBody: {
       values: [
         [

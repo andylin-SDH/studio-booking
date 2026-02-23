@@ -57,12 +57,15 @@ export async function POST(request: NextRequest) {
     const summary = `[預約-付費] ${order.name}`;
     const description = `聯絡方式：${order.contact}${order.note ? `\n備註：${order.note}` : ""}${order.discountCode ? `\n折扣碼：${order.discountCode}\n付費超出：${order.paidHours} 小時` : ""}`;
 
-    console.log("[ECPay Return] 建立行事曆", { start: order.start, end: order.end, studio: order.studio });
+    // 確保為 ISO 字串（試算表可能回傳不同格式）
+    const startIso = new Date(order.start).toISOString();
+    const endIso = new Date(order.end).toISOString();
+    console.log("[ECPay Return] 建立行事曆", { start: startIso, end: endIso, studio: order.studio });
 
     await createCalendarEvent(
       {
-        start: order.start,
-        end: order.end,
+        start: startIso,
+        end: endIso,
         summary,
         description,
       },
@@ -70,7 +73,7 @@ export async function POST(request: NextRequest) {
     );
 
     const durationHours = order.durationMinutes / 60;
-    const dateStr = order.start.slice(0, 10);
+    const dateStr = startIso.slice(0, 10);
 
     if (order.discountCode) {
       await addUsageRecord(
@@ -85,7 +88,12 @@ export async function POST(request: NextRequest) {
     await markPendingOrderCompleted(merchantTradeNo);
     console.log("[ECPay Return] 行事曆已建立，訂單已標記完成", { merchantTradeNo });
   } catch (e) {
-    console.error("[ECPay Return] 處理失敗", e);
+    const err = e instanceof Error ? e : new Error(String(e));
+    console.error("[ECPay Return] 處理失敗", {
+      message: err.message,
+      stack: err.stack,
+      merchantTradeNo,
+    });
   }
 
   return new NextResponse("1|OK", {
