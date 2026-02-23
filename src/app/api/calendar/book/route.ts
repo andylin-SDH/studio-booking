@@ -53,14 +53,15 @@ export async function POST(request: NextRequest) {
       const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
       const usedThisMonth = await getMonthlyUsage(discountCode.trim(), yearMonth);
       const remaining = kol.hoursPerMonth - usedThisMonth;
-      if (remaining < durationHours) {
-        const paidHours = durationHours - remaining;
+      const usableFree = Math.max(0, remaining); // 透支時不扣負數，僅付本次
+      if (usableFree < durationHours) {
+        const paidHours = durationHours - usableFree;
         return NextResponse.json({
           needPayment: true,
-          remainingHours: remaining,
+          remainingHours: usableFree,
           paidHours,
           durationHours,
-          message: `本月剩餘 ${remaining.toFixed(1)} 小時，本次 ${durationHours.toFixed(1)} 小時，超出 ${paidHours.toFixed(1)} 小時需付費`,
+          message: `本月剩餘 ${usableFree.toFixed(1)} 小時，本次 ${durationHours.toFixed(1)} 小時，超出 ${paidHours.toFixed(1)} 小時需付費`,
         });
       }
     } catch (e) {
