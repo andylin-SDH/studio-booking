@@ -30,7 +30,11 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
-  const durationHours = (body.durationMinutes || 0) / 60;
+  // 依 start/end 時間差計算時數，避免依賴前端 durationMinutes（可能有時區等誤差）
+  const startMs = new Date(start).getTime();
+  const endMs = new Date(end).getTime();
+  const durationMinutes = Math.round((endMs - startMs) / 60000);
+  const durationHours = durationMinutes / 60;
 
   // 若有折扣碼，驗證額度
   if (discountCode?.trim()) {

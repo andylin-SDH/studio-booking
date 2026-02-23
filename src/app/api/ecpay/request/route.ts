@@ -36,7 +36,6 @@ export async function POST(request: NextRequest) {
   const {
     start,
     end,
-    durationMinutes = 0,
     name,
     contact,
     note = "",
@@ -51,6 +50,11 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
+
+  // 依 start/end 計算實際時長（分鐘），不依賴前端
+  const durationMinutes = Math.round(
+    (new Date(end).getTime() - new Date(start).getTime()) / 60000
+  );
 
   const studioId = (studio === "small" ? "small" : "big") as "big" | "small";
   let amount = Math.ceil(paidHours * HOURLY_RATE);
