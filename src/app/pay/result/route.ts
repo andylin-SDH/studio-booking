@@ -9,7 +9,7 @@ function getBaseUrl() {
   );
 }
 
-function renderResultPage(status: string, orderId: string) {
+function renderResultPage(status: string, orderId: string, origin?: string) {
   const isSuccess = status === "success";
   const title =
     status === "success"
@@ -24,7 +24,7 @@ function renderResultPage(status: string, orderId: string) {
         ? "付款未完成，請重新預約或聯絡我們。"
         : "若已完成付款，請稍候或聯絡我們確認。";
 
-  const baseUrl = getBaseUrl();
+  const baseUrl = origin || getBaseUrl();
   return `<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -54,27 +54,30 @@ export async function POST(request: NextRequest) {
     params[key] = typeof val === "string" ? val : val.toString();
   });
 
-  const baseUrl = getBaseUrl();
+  // 使用請求的 origin 避免 baseUrl 與實際網域不同造成重導向迴圈
+  const url = new URL(request.url);
+  const origin = url.origin;
   const orderId = params["MerchantTradeNo"] || "";
   const rtnCode = params["RtnCode"];
   const status = rtnCode === "1" ? "success" : "fail";
 
   if (!verifyCheckMacValue(params)) {
-    return NextResponse.redirect(`${baseUrl}/pay/result?status=error`);
+    return NextResponse.redirect(`${origin}/pay/result?status=error`);
   }
 
   return NextResponse.redirect(
-    `${baseUrl}/pay/result?orderId=${encodeURIComponent(orderId)}&status=${status}`
+    `${origin}/pay/result?orderId=${encodeURIComponent(orderId)}&status=${status}`
   );
 }
 
 /** 顯示付款結果頁 */
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
+  const url = new URL(request.url);
+  const { searchParams } = url;
   const status = searchParams.get("status") || "success";
   const orderId = searchParams.get("orderId") || "";
 
-  const html = renderResultPage(status, orderId);
+  const html = renderResultPage(status, orderId, url.origin);
   return new NextResponse(html, {
     headers: { "Content-Type": "text/html; charset=utf-8" },
   });
