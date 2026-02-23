@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     "http://localhost:3000";
 
   const returnUrl = `${baseUrl}/api/ecpay/return`;
-  const orderResultUrl = `${baseUrl}/api/ecpay/order-result`;
+  const orderResultUrl = `${baseUrl}/pay/result`;
   const clientBackUrl = `${baseUrl}/#calendar`;
 
   try {
