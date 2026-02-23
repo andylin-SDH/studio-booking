@@ -71,6 +71,15 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+  } else {
+    // 無折扣碼：一律經綠界付款
+    return NextResponse.json({
+      needPayment: true,
+      remainingHours: 0,
+      paidHours: durationHours,
+      durationHours,
+      message: `本次預約 ${durationHours.toFixed(1)} 小時，請完成付款`,
+    });
   }
 
   try {

@@ -46,6 +46,7 @@ export function BookingModal({
   const [discountInfo, setDiscountInfo] = useState<DiscountInfo>(null);
   const [validating, setValidating] = useState(false);
   const [note, setNote] = useState("");
+  const [includeInvoice, setIncludeInvoice] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
 
@@ -142,6 +143,7 @@ export function BookingModal({
             discountCode: discountCode.trim() || undefined,
             studio,
             paidHours: data.paidHours,
+            includeTax: includeInvoice,
           }),
         });
         const payData = await payRes.json().catch(() => ({}));
@@ -258,6 +260,18 @@ export function BookingModal({
             {discountInfo && !discountInfo.valid && (
               <p className="mt-2 text-sm text-amber-600">{discountInfo.error}</p>
             )}
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="includeInvoice"
+              checked={includeInvoice}
+              onChange={(e) => setIncludeInvoice(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+            />
+            <label htmlFor="includeInvoice" className="text-sm font-medium text-slate-700">
+              需要開立發票（含 5% 稅金）
+            </label>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700">備註</label>

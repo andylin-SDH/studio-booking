@@ -5,8 +5,8 @@ import { addPendingOrder } from "@/lib/google-sheet";
 /** 超出時數：每小時 500、每半小時 250（TWD） */
 const HOURLY_RATE =
   parseFloat(process.env.PAYMENT_HOURLY_RATE || "500") || 500;
-/** 開立發票時加 5% 稅金 */
-const INCLUDE_TAX = process.env.PAYMENT_INCLUDE_TAX !== "false";
+/** 預設是否含稅（僅當前端未傳 includeTax 時使用） */
+const DEFAULT_INCLUDE_TAX = process.env.PAYMENT_INCLUDE_TAX === "true";
 
 /** 綠界 MerchantTradeNo 限制 20 字元 */
 function generateOrderId(): string {
@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
     discountCode?: string;
     studio?: string;
     paidHours?: number;
+    includeTax?: boolean;
   };
   try {
     body = await request.json();
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest) {
     discountCode = "",
     studio = "big",
     paidHours = 0,
+    includeTax = false,
   } = body;
 
   if (!start || !end || !name || !contact || paidHours <= 0) {
@@ -57,8 +59,9 @@ export async function POST(request: NextRequest) {
   );
 
   const studioId = (studio === "small" ? "small" : "big") as "big" | "small";
+  const addTax = body.includeTax !== undefined ? body.includeTax : DEFAULT_INCLUDE_TAX;
   let amount = Math.ceil(paidHours * HOURLY_RATE);
-  if (INCLUDE_TAX) {
+  if (addTax) {
     amount = Math.ceil(amount * 1.05);
   }
   if (amount < 1) {
@@ -95,7 +98,7 @@ export async function POST(request: NextRequest) {
     const { formActionUrl, formData } = buildEcpayForm({
       orderId,
       amount,
-      productName: `盛德好錄音室 · 超出 KOL 額度 ${paidHours.toFixed(1)} 小時${INCLUDE_TAX ? "（含5%稅）" : ""}`,
+      productName: `盛德好錄音室 · ${paidHours.toFixed(1)} 小時${addTax ? "（含5%稅）" : ""}`,
       returnUrl,
       orderResultUrl,
       clientBackUrl,
