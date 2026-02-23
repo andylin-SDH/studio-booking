@@ -21,6 +21,8 @@ import { zhTW } from "date-fns/locale";
 
 const DAY_START_HOUR = 9;
 const DAY_END_HOUR = 21;
+/** 最少起租時長（分鐘） */
+const MIN_DURATION_MINUTES = 60;
 /** 最多可預約到今天起的 N 個月內 */
 const MAX_BOOKING_MONTHS_AHEAD = 1;
 
@@ -142,7 +144,14 @@ export function CalendarSection({
 
   const handleStartChange = (val: string) => {
     setStartTime(val);
-    if (endTime && val >= endTime) setEndTime("");
+    if (endTime) {
+      const [sh, sm] = val.split(":").map(Number);
+      const [eh, em] = endTime.split(":").map(Number);
+      const durationMin = (eh * 60 + em) - (sh * 60 + sm);
+      if (val >= endTime || durationMin < MIN_DURATION_MINUTES) {
+        setEndTime("");
+      }
+    }
   };
 
   const handleDateChange = (date: Date | null) => {
@@ -260,9 +269,10 @@ export function CalendarSection({
                       const past = slotStart <= new Date();
                       const busy = isSlotBusy(slotStart, slotEnd);
                       const disabled = past || busy;
+                      const label = past ? (busy ? "（已過／已預約）" : "（已過）") : (busy ? "（已預約）" : "");
                       return (
                         <option key={t} value={t} disabled={disabled}>
-                          {t} {busy && "（已預約）"}
+                          {t} {label}
                         </option>
                       );
                     })}
@@ -278,7 +288,14 @@ export function CalendarSection({
                   >
                     <option value="">結束時間</option>
                     {timeOptions
-                      .filter((t) => startTime && t > startTime)
+                      .filter((t) => {
+                        if (!startTime || t <= startTime) return false;
+                        const [sh, sm] = startTime.split(":").map(Number);
+                        const [h, m] = t.split(":").map(Number);
+                        const durationMin =
+                          (h * 60 + m) - (sh * 60 + sm);
+                        return durationMin >= MIN_DURATION_MINUTES;
+                      })
                       .map((t) => {
                         const [h, m] = t.split(":").map(Number);
                         const [sh, sm] = startTime.split(":").map(Number);
@@ -286,22 +303,30 @@ export function CalendarSection({
                         slotStart.setHours(sh, sm, 0, 0);
                         const slotEnd = new Date(selectedDate);
                         slotEnd.setHours(h, m, 0, 0);
+                        const past = slotEnd <= new Date();
                         const busy = isSlotBusy(slotStart, slotEnd);
+                        const disabled = past || busy;
+                        const label = past ? (busy ? "（已過／與已預約重疊）" : "（已過）") : (busy ? "（與已預約重疊）" : "");
                         return (
-                          <option key={t} value={t} disabled={busy}>
-                            {t} {busy && "（與已預約重疊）"}
+                          <option key={t} value={t} disabled={disabled}>
+                            {t} {label}
                           </option>
                         );
                       })}
                   </select>
                 </div>
               </div>
+              <p className="text-xs text-slate-500">
+                最少起租 1 小時
+              </p>
               <button
                 type="button"
                 disabled={!startTime || !endTime || (() => {
                   if (!startTime || !endTime) return true;
                   const [sh, sm] = startTime.split(":").map(Number);
                   const [eh, em] = endTime.split(":").map(Number);
+                  const durationMin = (eh * 60 + em) - (sh * 60 + sm);
+                  if (durationMin < MIN_DURATION_MINUTES) return true;
                   const slotStart = new Date(selectedDate);
                   slotStart.setHours(sh, sm, 0, 0);
                   const slotEnd = new Date(selectedDate);

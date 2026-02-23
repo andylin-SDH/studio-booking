@@ -48,12 +48,13 @@ export async function POST(request: NextRequest) {
       const remaining = kol.hoursPerMonth - usedThisMonth;
       if (remaining < durationHours) {
         const paidHours = durationHours - remaining;
-        return NextResponse.json(
-          {
-            error: `本月免費額度不足。剩餘 ${remaining.toFixed(1)} 小時，本次需 ${durationHours.toFixed(1)} 小時，超出 ${paidHours.toFixed(1)} 小時需付費（付費功能尚未啟用）`,
-          },
-          { status: 400 }
-        );
+        return NextResponse.json({
+          needPayment: true,
+          remainingHours: remaining,
+          paidHours,
+          durationHours,
+          message: `本月剩餘 ${remaining.toFixed(1)} 小時，本次 ${durationHours.toFixed(1)} 小時，超出 ${paidHours.toFixed(1)} 小時需付費`,
+        });
       }
     } catch (e) {
       console.error("Discount check error:", e);

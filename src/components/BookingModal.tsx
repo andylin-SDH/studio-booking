@@ -98,13 +98,6 @@ export function BookingModal({
       setMessage({ type: "error", text: "請使用有效的折扣碼" });
       return;
     }
-    if (discountCode.trim() && discountInfo?.valid && discountInfo.remainingHours < durationHours) {
-      setMessage({
-        type: "error",
-        text: `本月剩餘額度 ${discountInfo.remainingHours.toFixed(1)} 小時，本次 ${durationHours.toFixed(1)} 小時，超出部分需付費（尚未啟用）`,
-      });
-      return;
-    }
     setSubmitting(true);
     setMessage(null);
     try {
@@ -123,6 +116,47 @@ export function BookingModal({
         }),
       });
       const data = await res.json().catch(() => ({}));
+
+      // 額度不足，需透過綠界 ECPay 付費
+      if (data.needPayment && data.paidHours) {
+        const payRes = await fetch("/api/ecpay/request", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            start: start.toISOString(),
+            end: end.toISOString(),
+            durationMinutes,
+            name: name.trim(),
+            contact: contact.trim(),
+            note: note.trim(),
+            discountCode: discountCode.trim() || undefined,
+            studio,
+            paidHours: data.paidHours,
+          }),
+        });
+        const payData = await payRes.json().catch(() => ({}));
+        if (payRes.ok && payData.formActionUrl && payData.formData) {
+          const form = document.createElement("form");
+          form.method = "POST";
+          form.action = payData.formActionUrl;
+          Object.entries(payData.formData).forEach(([k, v]) => {
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.name = k;
+            input.value = String(v);
+            form.appendChild(input);
+          });
+          document.body.appendChild(form);
+          form.submit();
+          return;
+        }
+        setMessage({
+          type: "error",
+          text: payData.error || "無法建立付款，請稍後再試。",
+        });
+        return;
+      }
+
       if (!res.ok) {
         setMessage({
           type: "error",
@@ -202,7 +236,13 @@ export function BookingModal({
             </div>
             {discountInfo?.valid && (
               <p className="mt-2 text-sm text-green-600">
-                親愛的『{discountInfo.kolName}』老師您好，本月錄音室剩餘時數為 {discountInfo.remainingHours.toFixed(1)} 小時
+                親愛的『{discountInfo.kolName}』老師您好，本月錄音室剩餘時數為{" "}
+                {discountInfo.remainingHours.toFixed(1)} 小時
+                {discountInfo.remainingHours < durationHours && (
+                  <span className="block mt-1 text-amber-600">
+                    超出部分將以綠界金流付費
+                  </span>
+                )}
               </p>
             )}
             {discountInfo && !discountInfo.valid && (
