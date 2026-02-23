@@ -6,7 +6,8 @@ import {
   addUsageRecord,
 } from "@/lib/google-sheet";
 import { createCalendarEvent } from "@/lib/google-calendar";
-import type { StudioId } from "@/lib/studios";
+import { sendBookingConfirmation } from "@/lib/email";
+import { STUDIOS, type StudioId } from "@/lib/studios";
 
 /** 綠界付款結果通知（Server POST），需回傳 1|OK */
 export async function POST(request: NextRequest) {
@@ -86,6 +87,14 @@ export async function POST(request: NextRequest) {
     }
 
     await markPendingOrderCompleted(merchantTradeNo);
+    await sendBookingConfirmation({
+      to: order.contact,
+      name: order.name,
+      start: startIso,
+      end: endIso,
+      studio: order.studio as StudioId,
+      studioLabel: STUDIOS[order.studio as StudioId],
+    });
     console.log("[ECPay Return] 行事曆已建立，訂單已標記完成", { merchantTradeNo });
   } catch (e) {
     const err = e instanceof Error ? e : new Error(String(e));

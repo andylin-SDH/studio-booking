@@ -5,6 +5,8 @@ import {
   getMonthlyUsage,
   addUsageRecord,
 } from "@/lib/google-sheet";
+import { sendBookingConfirmation } from "@/lib/email";
+import { STUDIOS } from "@/lib/studios";
 
 export async function POST(request: NextRequest) {
   let body: {
@@ -102,6 +104,15 @@ export async function POST(request: NextRequest) {
         studioId
       );
     }
+
+    await sendBookingConfirmation({
+      to: contact,
+      name,
+      start,
+      end,
+      studio: studioId,
+      studioLabel: STUDIOS[studioId],
+    });
 
     return NextResponse.json({ success: true });
   } catch (e) {

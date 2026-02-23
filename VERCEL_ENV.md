@@ -54,6 +54,19 @@
 
 ---
 
+## 預約完成通知郵件（選填）
+
+使用 [Resend](https://resend.com) 寄送預約完成通知。需先於 Resend 後台驗證網域 `sdh-corp.com`。
+
+| 變數名稱 | 說明 |
+|---------|------|
+| `RESEND_API_KEY` | Resend API Key（從 Resend 後台取得） |
+| `EMAIL_FROM` | 寄件者，預設 `盛德好錄音室 <andylin@sdh-corp.com>` |
+
+未設定時會跳過寄信，不影響預約流程。
+
+---
+
 ## 完整清單（複製用）
 
 ```
@@ -67,6 +80,8 @@ ECPAY_HASH_KEY=
 ECPAY_HASH_IV=
 ECPAY_SANDBOX=true
 NEXT_PUBLIC_APP_URL=https://你的專案.vercel.app
+RESEND_API_KEY=
+EMAIL_FROM=盛德好錄音室 <andylin@sdh-corp.com>
 ```
 
 填入實際值後貼到 Vercel 環境變數即可。
