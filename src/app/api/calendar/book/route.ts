@@ -30,9 +30,12 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
-  // 依 start/end 時間差計算時數，避免依賴前端 durationMinutes（可能有時區等誤差）
+  // 依 start/end 時間差計算時數（建議 client 傳 Asia/Taipei 格式如 2025-02-24T09:00:00+08:00）
   const startMs = new Date(start).getTime();
   const endMs = new Date(end).getTime();
+  if (isNaN(startMs) || isNaN(endMs) || endMs <= startMs) {
+    return NextResponse.json({ error: "無效的 start/end 時間" }, { status: 400 });
+  }
   const durationMinutes = Math.round((endMs - startMs) / 60000);
   const durationHours = durationMinutes / 60;
 

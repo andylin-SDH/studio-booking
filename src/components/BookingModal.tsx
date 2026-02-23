@@ -5,6 +5,16 @@ import { format } from "date-fns";
 import { STUDIOS } from "@/lib/studios";
 import { zhTW } from "date-fns/locale";
 
+/** 將 Date 轉為 Asia/Taipei ISO 字串，避免時區解析錯誤 */
+function toTaiwanISOString(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const h = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return `${y}-${m}-${d}T${h}:${min}:00+08:00`;
+}
+
 interface BookingModalProps {
   studio: "big" | "small";
   start: Date;
@@ -105,8 +115,8 @@ export function BookingModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          start: start.toISOString(),
-          end: end.toISOString(),
+          start: toTaiwanISOString(start),
+          end: toTaiwanISOString(end),
           durationMinutes,
           name: name.trim(),
           contact: contact.trim(),
@@ -123,8 +133,8 @@ export function BookingModal({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            start: start.toISOString(),
-            end: end.toISOString(),
+            start: toTaiwanISOString(start),
+            end: toTaiwanISOString(end),
             durationMinutes,
             name: name.trim(),
             contact: contact.trim(),
