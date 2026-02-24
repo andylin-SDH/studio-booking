@@ -47,15 +47,15 @@ export async function sendBookingConfirmation(params: BookingEmailParams): Promi
 <head><meta charset="utf-8"></head>
 <body style="margin:0;font-family:system-ui,sans-serif;color:#0f172a;background:#f8fafc;padding:24px">
   <div style="max-width:480px;margin:0 auto;background:white;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
-    <h2 style="margin:0 0 16px;font-size:1.25rem">預約完成通知</h2>
+    <h2 style="margin:0 0 16px;font-size:1.25rem">【盛德好】預約完成通知</h2>
     <p style="margin:0 0 16px;color:#64748b">親愛的 ${name} 您好，</p>
-    <p style="margin:0 0 16px">您的錄音室預約已完成，請於下列時段準時前往。</p>
+    <p style="margin:0 0 16px">您的錄音室預約已完成。</p>
     <div style="background:#f1f5f9;border-radius:8px;padding:16px;margin:16px 0">
       <p style="margin:0 0 8px"><strong>錄音室</strong>：${studioLabel}</p>
       <p style="margin:0 0 8px"><strong>開始時間</strong>：${startStr}</p>
       <p style="margin:0"><strong>結束時間</strong>：${endStr}</p>
     </div>
-    <p style="margin:16px 0 0;font-size:0.875rem;color:#94a3b8">盛德好錄音室 · 請加入 LINE 官方帳號索取大門及錄音室密碼</p>
+    <p style="margin:16px 0 0;font-size:0.875rem;color:#64748b">如需修改，請聯繫官方Line@或您的經紀人夥伴。<br><a href="https://lin.ee/v3u8YDR" style="color:#0ea5e9">lin.ee/v3u8YDR</a></p>
   </div>
 </body>
 </html>`;
@@ -64,7 +64,7 @@ export async function sendBookingConfirmation(params: BookingEmailParams): Promi
     const { error } = await client.emails.send({
       from: FROM_EMAIL,
       to: [to],
-      subject: `【盛德好錄音室】預約完成 - ${startStr}`,
+      subject: "【盛德好】預約完成通知",
       html,
     });
     if (error) {
