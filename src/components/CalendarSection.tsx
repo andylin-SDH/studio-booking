@@ -260,8 +260,9 @@ export function CalendarSection({
                 bookedMins > 0
                   ? `已約${bookedMins < 60 ? `${bookedMins}分` : `${(bookedMins / 60).toFixed(1)}h`}`
                   : null;
+              const showUsage = inMonth && !isPast;
               const usageBg =
-                usageLevel === "empty"
+                !showUsage || usageLevel === "empty"
                   ? ""
                   : usageLevel === "low"
                     ? "bg-emerald-50"
@@ -277,11 +278,11 @@ export function CalendarSection({
                   className={`min-h-[52px] border-b border-r border-slate-100 p-2 text-left text-sm transition
                     ${inMonth ? "text-slate-800" : "text-slate-300"}
                     ${!selectable ? "cursor-not-allowed opacity-50" : "hover:bg-slate-50"}
-                    ${selected ? "bg-sky-100 ring-2 ring-sky-500" : inMonth ? usageBg : ""}
+                    ${selected ? "bg-sky-100 ring-2 ring-sky-500" : showUsage ? usageBg : ""}
                     ${isToday(day) ? "font-semibold text-sky-600" : ""}`}
                 >
                   <span className="block">{format(day, "d")}</span>
-                  {bookedHoursLabel && inMonth && (
+                  {bookedHoursLabel && showUsage && (
                     <span
                       className={`block truncate text-[10px] leading-tight ${
                         usageLevel === "full" ? "text-rose-600" : usageLevel === "medium" ? "text-amber-700" : "text-emerald-600"
