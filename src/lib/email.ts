@@ -33,6 +33,8 @@ export interface InvoiceNotificationParams {
   end: string;
   studio: "big" | "small";
   studioLabel: string;
+  /** 金額（選填，付費訂單時傳入） */
+  amount?: number;
 }
 
 function formatDateTime(iso: string): string {
@@ -99,9 +101,11 @@ export async function sendInvoiceNotificationToAdmin(
     return false;
   }
 
-  const { name, contact, start, end, studioLabel } = params;
+  const { name, contact, start, end, studioLabel, amount } = params;
   const startStr = formatDateTime(start);
   const endStr = formatDateTime(end);
+  const amountStr =
+    amount != null && amount > 0 ? `NT$ ${amount.toLocaleString()}` : "";
 
   const html = `
 <!DOCTYPE html>
@@ -116,7 +120,8 @@ export async function sendInvoiceNotificationToAdmin(
       <p style="margin:0 0 8px"><strong>聯絡方式</strong>：${contact}</p>
       <p style="margin:0 0 8px"><strong>錄音室</strong>：${studioLabel}</p>
       <p style="margin:0 0 8px"><strong>開始時間</strong>：${startStr}</p>
-      <p style="margin:0"><strong>結束時間</strong>：${endStr}</p>
+      <p style="margin:0 0 8px"><strong>結束時間</strong>：${endStr}</p>
+      <p style="margin:0"><strong>金額</strong>：${amountStr}</p>
     </div>
   </div>
 </body>

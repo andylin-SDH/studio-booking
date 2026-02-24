@@ -103,6 +103,7 @@ export async function POST(request: NextRequest) {
         end: endIso,
         studio: order.studio as StudioId,
         studioLabel: STUDIOS[order.studio as StudioId],
+        amount: order.amount,
       });
     }
     console.log("[ECPay Return] 行事曆已建立，訂單已標記完成", { merchantTradeNo });

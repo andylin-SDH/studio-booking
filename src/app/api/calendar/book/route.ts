@@ -5,7 +5,7 @@ import {
   getMonthlyUsage,
   addUsageRecord,
 } from "@/lib/google-sheet";
-import { sendBookingConfirmation, sendInvoiceNotificationToAdmin } from "@/lib/email";
+import { sendBookingConfirmation } from "@/lib/email";
 import { STUDIOS } from "@/lib/studios";
 
 export async function POST(request: NextRequest) {
@@ -115,16 +115,7 @@ export async function POST(request: NextRequest) {
       studioLabel: STUDIOS[studioId],
     });
 
-    if (includeInvoice) {
-      await sendInvoiceNotificationToAdmin({
-        name,
-        contact,
-        start,
-        end,
-        studio: studioId,
-        studioLabel: STUDIOS[studioId],
-      });
-    }
+    // 免付費預約（純折扣碼）沒有產生金額，不寄送開立發票通知信；僅付費訂單完成時於 ecpay/return 寄送
 
     return NextResponse.json({ success: true });
   } catch (e) {
