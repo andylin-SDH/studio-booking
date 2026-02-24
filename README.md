@@ -80,7 +80,7 @@ npm run dev
 
 若既有使用記錄僅有 4 欄，請在試算表中新增第 5 欄標題「大小間」。
 
-付費計費：每小時 500 元、每半小時 250 元；開立發票時加 5% 稅金。若啟用綠界 ECPay 付費（KOL 額度不足時），請設定 ECPAY_* 環境變數，並在試算表新增工作表「待付款訂單」，第 1 列標題：`orderId | start | end | durationMinutes | name | contact | note | discountCode | studio | paidHours | amount | status | createdAt`
+付費計費：每小時 500 元、每半小時 250 元；開立發票時加 5% 稅金。若啟用綠界 ECPay 付費（KOL 額度不足時），請設定 ECPAY_* 環境變數，並在試算表新增工作表「待付款訂單」，第 1 列標題：`orderId | start | end | durationMinutes | name | contact | note | discountCode | studio | paidHours | amount | status | createdAt | includeInvoice`（最後一欄記錄是否需開立發票，有勾選時為「是」）。當使用者勾選需開立發票時，系統會另寄一封通知信至 sandehao@gmail.com。
 
 若工作表名稱不同，可設 `GOOGLE_SHEET_KOL_SHEET`、`GOOGLE_SHEET_USAGE_SHEET` 覆寫。
 

@@ -124,6 +124,7 @@ export function BookingModal({
           note: note.trim(),
           discountCode: discountCode.trim() || undefined,
           studio,
+          includeInvoice,
         }),
       });
       const data = await res.json().catch(() => ({}));

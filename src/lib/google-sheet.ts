@@ -171,6 +171,8 @@ export interface PendingOrder {
   amount: number;
   status: "pending" | "completed" | "cancelled";
   createdAt: string;
+  /** 是否需要開立發票 */
+  includeInvoice: boolean;
 }
 
 /** 取得待付款工作表名稱（試算表中須有此工作表） */
@@ -191,9 +193,10 @@ export async function addPendingOrder(order: PendingOrder): Promise<void> {
   const sheetName = await getPendingSheetName();
 
   // 使用 RAW 保留 start/end 的 ISO 字串格式，供行事曆 API 使用
+  // 欄位 A~N：orderId, start, end, durationMinutes, name, contact, note, discountCode, studio, paidHours, amount, status, createdAt, includeInvoice
   await sheets.spreadsheets.values.append({
     spreadsheetId: sheetId,
-    range: `${sheetName}!A:M`,
+    range: `${sheetName}!A:N`,
     valueInputOption: "RAW",
     requestBody: {
       values: [
@@ -211,6 +214,7 @@ export async function addPendingOrder(order: PendingOrder): Promise<void> {
           order.amount,
           order.status,
           order.createdAt,
+          order.includeInvoice ? "是" : "",
         ],
       ],
     },
@@ -228,7 +232,7 @@ export async function getPendingOrder(
 
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: sheetId,
-    range: `${sheetName}!A2:M`,
+    range: `${sheetName}!A2:N`,
   });
   const rows = (res.data.values || []) as string[][];
   const normalized = orderId.trim();
@@ -236,6 +240,7 @@ export async function getPendingOrder(
   for (const row of rows) {
     const [oid] = row;
     if (oid && oid.trim() === normalized) {
+      const includeInvoiceVal = row[13];
       return {
         orderId: row[0] || "",
         start: row[1] || "",
@@ -250,6 +255,7 @@ export async function getPendingOrder(
         amount: parseFloat(row[10] || "0"),
         status: (row[11] as "pending" | "completed" | "cancelled") || "pending",
         createdAt: row[12] || "",
+        includeInvoice: includeInvoiceVal === "是" || includeInvoiceVal === "true" || includeInvoiceVal === "1",
       };
     }
   }
@@ -265,7 +271,7 @@ export async function markPendingOrderCompleted(orderId: string): Promise<void> 
 
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: sheetId,
-    range: `${sheetName}!A2:M`,
+    range: `${sheetName}!A2:N`,
   });
   const rows = (res.data.values || []) as string[][];
   const normalized = orderId.trim();

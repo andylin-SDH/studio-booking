@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
       amount,
       status: "pending",
       createdAt: new Date().toISOString(),
+      includeInvoice: addTax,
     });
 
     const { formActionUrl, formData } = buildEcpayForm({

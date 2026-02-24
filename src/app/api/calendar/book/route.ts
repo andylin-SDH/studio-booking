@@ -5,7 +5,7 @@ import {
   getMonthlyUsage,
   addUsageRecord,
 } from "@/lib/google-sheet";
-import { sendBookingConfirmation } from "@/lib/email";
+import { sendBookingConfirmation, sendInvoiceNotificationToAdmin } from "@/lib/email";
 import { STUDIOS } from "@/lib/studios";
 
 export async function POST(request: NextRequest) {
@@ -18,13 +18,14 @@ export async function POST(request: NextRequest) {
     note?: string;
     discountCode?: string;
     studio?: string;
+    includeInvoice?: boolean;
   };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "無效的請求內容" }, { status: 400 });
   }
-  const { start, end, name, contact, note, discountCode, studio } = body;
+  const { start, end, name, contact, note, discountCode, studio, includeInvoice } = body;
   const studioId = (studio === "small" ? "small" : "big") as import("@/lib/studios").StudioId;
   if (!start || !end || !name || !contact) {
     return NextResponse.json(
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const summary = `[預約] ${name}`;
-    const description = `聯絡方式：${contact}${note ? `\n備註：${note}` : ""}${discountCode?.trim() ? `\n折扣碼：${discountCode.trim()}` : ""}`;
+    const description = `聯絡方式：${contact}${note ? `\n備註：${note}` : ""}${discountCode?.trim() ? `\n折扣碼：${discountCode.trim()}` : ""}${includeInvoice ? "\n需開立發票：是" : ""}`;
 
     await createCalendarEvent(
       { start, end, summary, description },
@@ -113,6 +114,17 @@ export async function POST(request: NextRequest) {
       studio: studioId,
       studioLabel: STUDIOS[studioId],
     });
+
+    if (includeInvoice) {
+      await sendInvoiceNotificationToAdmin({
+        name,
+        contact,
+        start,
+        end,
+        studio: studioId,
+        studioLabel: STUDIOS[studioId],
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (e) {

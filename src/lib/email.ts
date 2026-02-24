@@ -14,10 +14,22 @@ function getResendClient() {
   return new Resend(key);
 }
 
+const ADMIN_INVOICE_EMAIL = "sandehao@gmail.com";
+
 export interface BookingEmailParams {
   to: string; // 預約者 Email
   name: string;
   start: string; // ISO
+  end: string;
+  studio: "big" | "small";
+  studioLabel: string;
+}
+
+/** 需開立發票時，通知管理員（固定寄至 sandehao@gmail.com） */
+export interface InvoiceNotificationParams {
+  name: string;
+  contact: string;
+  start: string;
   end: string;
   studio: "big" | "small";
   studioLabel: string;
@@ -74,6 +86,56 @@ export async function sendBookingConfirmation(params: BookingEmailParams): Promi
     return true;
   } catch (e) {
     console.error("[Email] 寄送失敗", e);
+    return false;
+  }
+}
+
+export async function sendInvoiceNotificationToAdmin(
+  params: InvoiceNotificationParams
+): Promise<boolean> {
+  const client = getResendClient();
+  if (!client) {
+    console.warn("[Email] 未設定 RESEND_API_KEY，跳過寄信");
+    return false;
+  }
+
+  const { name, contact, start, end, studioLabel } = params;
+  const startStr = formatDateTime(start);
+  const endStr = formatDateTime(end);
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;font-family:system-ui,sans-serif;color:#0f172a;background:#f8fafc;padding:24px">
+  <div style="max-width:480px;margin:0 auto;background:white;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
+    <h2 style="margin:0 0 16px;font-size:1.25rem">【盛德好】預約需開立發票</h2>
+    <p style="margin:0 0 16px;color:#64748b">以下預約已勾選需要開立發票，請協助處理。</p>
+    <div style="background:#fef3c7;border-radius:8px;padding:16px;margin:16px 0;border:1px solid #fcd34d">
+      <p style="margin:0 0 8px"><strong>預約人</strong>：${name}</p>
+      <p style="margin:0 0 8px"><strong>聯絡方式</strong>：${contact}</p>
+      <p style="margin:0 0 8px"><strong>錄音室</strong>：${studioLabel}</p>
+      <p style="margin:0 0 8px"><strong>開始時間</strong>：${startStr}</p>
+      <p style="margin:0"><strong>結束時間</strong>：${endStr}</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  try {
+    const { error } = await client.emails.send({
+      from: FROM_EMAIL,
+      to: [ADMIN_INVOICE_EMAIL],
+      subject: "【盛德好】預約需開立發票",
+      html,
+    });
+    if (error) {
+      console.error("[Email] 開立發票通知寄送失敗", error);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("[Email] 開立發票通知寄送失敗", e);
     return false;
   }
 }
