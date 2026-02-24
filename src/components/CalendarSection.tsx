@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   format,
   startOfMonth,
@@ -16,6 +16,8 @@ import {
   isToday,
   isBefore,
   parseISO,
+  setHours,
+  setMinutes,
 } from "date-fns";
 import { zhTW } from "date-fns/locale";
 
@@ -123,6 +125,34 @@ export function CalendarSection({
     [events]
   );
 
+  /** 當日可預約總分鐘數（9:00–21:00） */
+  const totalMinutesPerDay = (DAY_END_HOUR - DAY_START_HOUR) * 60;
+
+  /** 計算某天在營業時段內已被預約的分鐘數 */
+  const getBookedMinutesOnDay = useCallback(
+    (day: Date) => {
+      const dayStart = setMinutes(setHours(startOfDay(day), DAY_START_HOUR), 0);
+      const dayEnd = setMinutes(setHours(startOfDay(day), DAY_END_HOUR), 0);
+      let total = 0;
+      for (const range of eventRanges) {
+        const start = range.start > dayStart ? range.start : dayStart;
+        const end = range.end < dayEnd ? range.end : dayEnd;
+        if (start < end) total += (end.getTime() - start.getTime()) / 60000;
+      }
+      return Math.round(total);
+    },
+    [eventRanges]
+  );
+
+  /** 每日使用狀況：日期字串 yyyy-MM-dd -> 已預約分鐘數 */
+  const dailyUsage = useMemo(() => {
+    const map = new Map<string, number>();
+    weeks.flat().forEach((day) => {
+      map.set(format(day, "yyyy-MM-dd"), getBookedMinutesOnDay(day));
+    });
+    return map;
+  }, [weeks, getBookedMinutesOnDay]);
+
   /** 檢查時段是否與任何已預約事件重疊 */
   const isSlotBusy = (slotStart: Date, slotEnd: Date) =>
     eventRanges.some(
@@ -205,7 +235,7 @@ export function CalendarSection({
         僅可預約今日起 {MAX_BOOKING_MONTHS_AHEAD} 個月內
       </p>
 
-      {/* 月曆格子 */}
+      {/* 月曆格子 + 圖例 */}
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-center text-sm font-medium text-slate-600">
           {["日", "一", "二", "三", "四", "五", "六"].map((d) => (
@@ -222,24 +252,65 @@ export function CalendarSection({
               const isPast = isBefore(startOfDay(day), startOfDay(new Date()));
               const beyondMax = startOfDay(day) > maxDate;
               const selectable = inMonth && !isPast && !beyondMax;
+              const bookedMins = inMonth ? (dailyUsage.get(format(day, "yyyy-MM-dd")) ?? 0) : 0;
+              const ratio = totalMinutesPerDay > 0 ? bookedMins / totalMinutesPerDay : 0;
+              const usageLevel: "empty" | "low" | "medium" | "full" =
+                ratio <= 0 ? "empty" : ratio < 1 / 3 ? "low" : ratio < 2 / 3 ? "medium" : "full";
+              const bookedHoursLabel =
+                bookedMins > 0
+                  ? `已約${bookedMins < 60 ? `${bookedMins}分` : `${(bookedMins / 60).toFixed(1)}h`}`
+                  : null;
+              const usageBg =
+                usageLevel === "empty"
+                  ? ""
+                  : usageLevel === "low"
+                    ? "bg-emerald-50"
+                    : usageLevel === "medium"
+                      ? "bg-amber-50"
+                      : "bg-rose-100";
               return (
                 <button
                   key={day.toISOString()}
                   type="button"
                   disabled={!selectable}
                   onClick={() => handleDateChange(selectable ? day : null)}
-                  className={`min-h-[44px] border-b border-r border-slate-100 p-2 text-left text-sm transition
+                  className={`min-h-[52px] border-b border-r border-slate-100 p-2 text-left text-sm transition
                     ${inMonth ? "text-slate-800" : "text-slate-300"}
                     ${!selectable ? "cursor-not-allowed opacity-50" : "hover:bg-slate-50"}
-                    ${selected ? "bg-sky-100 ring-2 ring-sky-500" : ""}
+                    ${selected ? "bg-sky-100 ring-2 ring-sky-500" : inMonth ? usageBg : ""}
                     ${isToday(day) ? "font-semibold text-sky-600" : ""}`}
                 >
-                  {format(day, "d")}
+                  <span className="block">{format(day, "d")}</span>
+                  {bookedHoursLabel && inMonth && (
+                    <span
+                      className={`block truncate text-[10px] leading-tight ${
+                        usageLevel === "full" ? "text-rose-600" : usageLevel === "medium" ? "text-amber-700" : "text-emerald-600"
+                      }`}
+                      title={`當日已預約 ${bookedMins} 分鐘`}
+                    >
+                      {bookedHoursLabel}
+                    </span>
+                  )}
                 </button>
               );
             })}
           </div>
         ))}
+        <div className="flex flex-wrap items-center gap-4 border-t border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-600">
+          <span className="font-medium">當日使用狀況：</span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-3 w-4 rounded border border-emerald-200 bg-emerald-50" />
+            空閒較多
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-3 w-4 rounded border border-amber-200 bg-amber-50" />
+            部分時段已約
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-3 w-4 rounded border border-rose-200 bg-rose-100" />
+            較滿
+          </span>
+        </div>
       </div>
 
       {/* 已選日期：開始 / 結束時間下拉選單 */}
