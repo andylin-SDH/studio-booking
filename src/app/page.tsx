@@ -46,9 +46,16 @@ export default function Home() {
       {/* 導覽 */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0c0f14]/90 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
-          <span className="text-lg font-bold tracking-tight text-white">
-            盛德好錄音室<span className="gradient-text"> · 預約</span>
-          </span>
+          <a href="#" className="flex items-center gap-3">
+            <img
+              src="/logo.png"
+              alt="SDI 盛德好"
+              className="h-8 w-auto object-contain"
+            />
+            <span className="text-lg font-bold tracking-tight text-white">
+              <span className="gradient-text">錄音室 · 預約</span>
+            </span>
+          </a>
           <nav className="flex gap-8 text-sm">
             <a href="#space" className="text-slate-400 transition hover:text-amber-400">空間介紹</a>
             <a href="#venue" className="text-slate-400 transition hover:text-amber-400">場地介紹</a>
