@@ -4,9 +4,12 @@
 
 :root {
   --foreground: #0f172a;
-  --background: #f8fafc;
-  --accent: #0ea5e9;
-  --muted: #64748b;
+  --background: #0c0f14;
+  --surface: #151922;
+  --accent: #f59e0b;
+  --accent-hover: #fbbf24;
+  --muted: #94a3b8;
+  --border: #1e293b;
 }
 
 body {
@@ -17,5 +20,8 @@ body {
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-amber-400 to-orange-500;
   }
 }
