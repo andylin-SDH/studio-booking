@@ -169,7 +169,7 @@ export default function Home() {
           <h2 className="mb-2 text-3xl font-bold tracking-tight text-white">
             空間使用狀況 · 選擇預約時段
           </h2>
-          <p className="mb-4 text-slate-500">
+          <p className="mb-4 text-amber-400">
             請先選擇錄音室，再選擇日期與時段，並點選「立即預約」。
           </p>
           <div className="mb-6 flex flex-wrap items-center gap-3">
