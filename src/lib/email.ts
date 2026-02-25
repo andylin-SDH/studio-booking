@@ -23,6 +23,8 @@ export interface BookingEmailParams {
   end: string;
   studio: "big" | "small";
   studioLabel: string;
+  /** 訪談來賓（選填），用於 .ics 標題 */
+  interviewGuests?: string;
 }
 
 /** 需開立發票時，通知管理員（固定寄至 sandehao@gmail.com） */
@@ -44,6 +46,39 @@ function formatDateTime(iso: string): string {
   return `${date} ${time}`;
 }
 
+/** 產生預約的 .ics 內容，供客戶加入行事曆 */
+function buildBookingIcs(params: {
+  name: string;
+  start: string;
+  end: string;
+  studioLabel: string;
+  interviewGuests?: string;
+}): string {
+  const { name, start, end, studioLabel, interviewGuests } = params;
+  const uid = `${Date.now()}-${Math.random().toString(36).slice(2)}@sdh-corp.com`;
+  const startUtc = new Date(start).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  const endUtc = new Date(end).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  const summary = `[錄音室預約] ${name}${interviewGuests?.trim() ? ` ${interviewGuests.trim()}` : ""} ${studioLabel}`;
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//盛德好錄音室//Booking//ZH",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:${uid}`,
+    `DTSTAMP:${startUtc}`,
+    `DTSTART:${startUtc}`,
+    `DTEND:${endUtc}`,
+    `SUMMARY:${summary.replace(/\r?\n/g, " ")}`,
+    `DESCRIPTION:${studioLabel} 錄音預約`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+    "",
+  ];
+  return lines.join("\r\n");
+}
+
 export async function sendBookingConfirmation(params: BookingEmailParams): Promise<boolean> {
   const client = getResendClient();
   if (!client) {
@@ -51,9 +86,11 @@ export async function sendBookingConfirmation(params: BookingEmailParams): Promi
     return false;
   }
 
-  const { to, name, start, end, studioLabel } = params;
+  const { to, name, start, end, studioLabel, interviewGuests } = params;
   const startStr = formatDateTime(start);
   const endStr = formatDateTime(end);
+
+  const icsContent = buildBookingIcs({ name, start, end, studioLabel, interviewGuests });
 
   const html = `
 <!DOCTYPE html>
@@ -80,6 +117,12 @@ export async function sendBookingConfirmation(params: BookingEmailParams): Promi
       to: [to],
       subject: "【盛德好】預約完成通知",
       html,
+      attachments: [
+        {
+          filename: "booking.ics",
+          content: Buffer.from(icsContent, "utf-8").toString("base64"),
+        },
+      ],
     });
     if (error) {
       console.error("[Email] 寄送失敗", error);

@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     const description = `聯絡方式：${contact}${note ? `\n備註：${note}` : ""}${interviewGuests?.trim() ? `\n訪談來賓：${interviewGuests.trim()}` : ""}${discountCode?.trim() ? `\n折扣碼：${discountCode.trim()}` : ""}${includeInvoice ? "\n需開立發票：是" : ""}`;
 
     await createCalendarEvent(
-      { start, end, summary, description, attendees: [contact] },
+      { start, end, summary, description },
       studioId
     );
 
@@ -115,6 +115,7 @@ export async function POST(request: NextRequest) {
       end,
       studio: studioId,
       studioLabel: STUDIOS[studioId],
+      interviewGuests: interviewGuests?.trim(),
     });
 
     // 免付費預約（純折扣碼）沒有產生金額，不寄送開立發票通知信；僅付費訂單完成時於 ecpay/return 寄送

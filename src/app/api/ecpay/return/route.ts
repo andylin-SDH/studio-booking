@@ -69,7 +69,6 @@ export async function POST(request: NextRequest) {
         end: endIso,
         summary,
         description,
-        attendees: [order.contact],
       },
       order.studio as StudioId
     );
@@ -96,6 +95,7 @@ export async function POST(request: NextRequest) {
       end: endIso,
       studio: order.studio as StudioId,
       studioLabel: STUDIOS[order.studio as StudioId],
+      interviewGuests: order.interviewGuests?.trim(),
     });
     if (order.includeInvoice) {
       await sendInvoiceNotificationToAdmin({
