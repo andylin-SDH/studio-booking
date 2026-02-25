@@ -169,12 +169,26 @@ export default function Home() {
           <h2 className="mb-2 text-3xl font-bold tracking-tight text-white">
             空間使用狀況 · 選擇預約時段
           </h2>
+          <p className="mb-4 text-slate-500">
+            請先選擇錄音室，再選擇日期與時段，並點選「立即預約」。
+          </p>
+          <div className="mb-6 flex flex-wrap items-center gap-3">
+            <span className="text-sm font-medium text-slate-400">
+              選擇錄音室
+            </span>
+            <span className="hidden text-slate-600 sm:inline" aria-hidden>·</span>
+            <span className="hidden text-sm text-slate-500 sm:inline">
+              點選可切換大間／小間，下方月曆會顯示該錄音室時段
+            </span>
+          </div>
           <div className="mb-6 flex flex-wrap gap-3">
             {(Object.keys(STUDIOS) as StudioId[]).map((id) => (
               <button
                 key={id}
                 type="button"
                 onClick={() => handleStudioChange(id)}
+                aria-pressed={studio === id}
+                aria-label={`選擇${STUDIOS[id]}`}
                 className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition-all duration-200 ${
                   studio === id
                     ? "bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/25"
@@ -185,9 +199,6 @@ export default function Home() {
               </button>
             ))}
           </div>
-          <p className="mb-6 text-slate-500">
-            請先選擇錄音室，再選擇日期與時段，並點選「立即預約」。
-          </p>
           <div className="rounded-2xl border border-white/10 bg-slate-800/20 p-6 ring-1 ring-white/5">
             <CalendarSection
               studio={studio}
