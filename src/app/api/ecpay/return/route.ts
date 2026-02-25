@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       return new NextResponse("1|OK");
     }
 
-    const summary = `[預約-付費] ${order.name}`;
+    const summary = `[錄音室預約-付費] ${order.name}${order.interviewGuests?.trim() ? ` ${order.interviewGuests.trim()}` : ""}`;
     const description = `聯絡方式：${order.contact}${order.note ? `\n備註：${order.note}` : ""}${order.interviewGuests ? `\n訪談來賓：${order.interviewGuests}` : ""}${order.discountCode ? `\n折扣碼：${order.discountCode}\n付費超出：${order.paidHours} 小時` : ""}`;
 
     // 確保為 ISO 字串（試算表可能回傳不同格式）
@@ -69,6 +69,7 @@ export async function POST(request: NextRequest) {
         end: endIso,
         summary,
         description,
+        attendees: [order.contact],
       },
       order.studio as StudioId
     );
