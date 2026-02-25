@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
     name?: string;
     contact?: string;
     note?: string;
+    interviewGuests?: string;
     discountCode?: string;
     studio?: string;
     paidHours?: number;
@@ -40,6 +41,7 @@ export async function POST(request: NextRequest) {
     name,
     contact,
     note = "",
+    interviewGuests = "",
     discountCode = "",
     studio = "big",
     paidHours = 0,
@@ -94,6 +96,7 @@ export async function POST(request: NextRequest) {
       status: "pending",
       createdAt: new Date().toISOString(),
       includeInvoice: addTax,
+      interviewGuests: (interviewGuests && interviewGuests.trim()) || "",
     });
 
     const { formActionUrl, formData } = buildEcpayForm({

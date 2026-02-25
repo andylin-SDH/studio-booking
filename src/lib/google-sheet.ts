@@ -131,13 +131,14 @@ export async function getMonthlyUsage(
   return total;
 }
 
-/** 新增一筆使用記錄（含大小間欄位） */
+/** 新增一筆使用記錄（含大小間、訪談來賓欄位） */
 export async function addUsageRecord(
   code: string,
   dateStr: string,
   hoursUsed: number,
   summary: string,
-  studio?: "big" | "small"
+  studio?: "big" | "small",
+  interviewGuests?: string
 ): Promise<void> {
   const auth = getAuth();
   const sheets = google.sheets({ version: "v4", auth });
@@ -148,10 +149,10 @@ export async function addUsageRecord(
 
   await sheets.spreadsheets.values.append({
     spreadsheetId: sheetId,
-    range: `${usage}!A:E`,
+    range: `${usage}!A:F`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
-      values: [[code.trim(), dateStr, hoursUsed, summary, studioLabel]],
+      values: [[code.trim(), dateStr, hoursUsed, summary, studioLabel, interviewGuests?.trim() || ""]],
     },
   });
 }
@@ -173,6 +174,8 @@ export interface PendingOrder {
   createdAt: string;
   /** 是否需要開立發票 */
   includeInvoice: boolean;
+  /** 訪談來賓（選填） */
+  interviewGuests: string;
 }
 
 /** 取得待付款工作表名稱（試算表中須有此工作表） */
@@ -193,10 +196,10 @@ export async function addPendingOrder(order: PendingOrder): Promise<void> {
   const sheetName = await getPendingSheetName();
 
   // 使用 RAW 保留 start/end 的 ISO 字串格式，供行事曆 API 使用
-  // 欄位 A~N：orderId, start, end, durationMinutes, name, contact, note, discountCode, studio, paidHours, amount, status, createdAt, includeInvoice
+  // 欄位 A~O：orderId, start, end, durationMinutes, name, contact, note, discountCode, studio, paidHours, amount, status, createdAt, includeInvoice, interviewGuests
   await sheets.spreadsheets.values.append({
     spreadsheetId: sheetId,
-    range: `${sheetName}!A:N`,
+    range: `${sheetName}!A:O`,
     valueInputOption: "RAW",
     requestBody: {
       values: [
@@ -215,6 +218,7 @@ export async function addPendingOrder(order: PendingOrder): Promise<void> {
           order.status,
           order.createdAt,
           order.includeInvoice ? "是" : "",
+          order.interviewGuests || "",
         ],
       ],
     },
@@ -232,7 +236,7 @@ export async function getPendingOrder(
 
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: sheetId,
-    range: `${sheetName}!A2:N`,
+    range: `${sheetName}!A2:O`,
   });
   const rows = (res.data.values || []) as string[][];
   const normalized = orderId.trim();
@@ -256,6 +260,7 @@ export async function getPendingOrder(
         status: (row[11] as "pending" | "completed" | "cancelled") || "pending",
         createdAt: row[12] || "",
         includeInvoice: includeInvoiceVal === "是" || includeInvoiceVal === "true" || includeInvoiceVal === "1",
+        interviewGuests: row[14] || "",
       };
     }
   }
@@ -271,7 +276,7 @@ export async function markPendingOrderCompleted(orderId: string): Promise<void> 
 
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: sheetId,
-    range: `${sheetName}!A2:N`,
+    range: `${sheetName}!A2:O`,
   });
   const rows = (res.data.values || []) as string[][];
   const normalized = orderId.trim();

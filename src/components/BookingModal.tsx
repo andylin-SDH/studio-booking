@@ -47,6 +47,7 @@ export function BookingModal({
   const [discountInfo, setDiscountInfo] = useState<DiscountInfo>(null);
   const [validating, setValidating] = useState(false);
   const [note, setNote] = useState("");
+  const [interviewGuests, setInterviewGuests] = useState("");
   const [includeInvoice, setIncludeInvoice] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
@@ -122,6 +123,7 @@ export function BookingModal({
           name: name.trim(),
           contact: contact.trim(),
           note: note.trim(),
+          interviewGuests: interviewGuests.trim() || undefined,
           discountCode: discountCode.trim() || undefined,
           studio,
           includeInvoice,
@@ -141,6 +143,7 @@ export function BookingModal({
             name: name.trim(),
             contact: contact.trim(),
             note: note.trim(),
+            interviewGuests: interviewGuests.trim() || undefined,
             discountCode: discountCode.trim() || undefined,
             studio,
             paidHours: data.paidHours,
@@ -223,6 +226,16 @@ export function BookingModal({
               onChange={(e) => setContact(e.target.value)}
               className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
               placeholder="您的 Email（預約完成後將寄送通知信）"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700">訪談來賓（選填）</label>
+            <input
+              type="text"
+              value={interviewGuests}
+              onChange={(e) => setInterviewGuests(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              placeholder="方便我們為您接待提早到的來賓"
             />
           </div>
           <div>

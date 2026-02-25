@@ -16,6 +16,7 @@ export async function POST(request: NextRequest) {
     name?: string;
     contact?: string;
     note?: string;
+    interviewGuests?: string;
     discountCode?: string;
     studio?: string;
     includeInvoice?: boolean;
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "無效的請求內容" }, { status: 400 });
   }
-  const { start, end, name, contact, note, discountCode, studio, includeInvoice } = body;
+  const { start, end, name, contact, note, interviewGuests, discountCode, studio, includeInvoice } = body;
   const studioId = (studio === "small" ? "small" : "big") as import("@/lib/studios").StudioId;
   if (!start || !end || !name || !contact) {
     return NextResponse.json(
@@ -87,14 +88,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const summary = `[預約] ${name}`;
-    const description = `聯絡方式：${contact}${note ? `\n備註：${note}` : ""}${discountCode?.trim() ? `\n折扣碼：${discountCode.trim()}` : ""}${includeInvoice ? "\n需開立發票：是" : ""}`;
+    const description = `聯絡方式：${contact}${note ? `\n備註：${note}` : ""}${interviewGuests?.trim() ? `\n訪談來賓：${interviewGuests.trim()}` : ""}${discountCode?.trim() ? `\n折扣碼：${discountCode.trim()}` : ""}${includeInvoice ? "\n需開立發票：是" : ""}`;
 
     await createCalendarEvent(
       { start, end, summary, description },
       studioId
     );
 
-    // 若有折扣碼，寫入使用記錄（含大小間）
+    // 若有折扣碼，寫入使用記錄（含大小間、訪談來賓）
     if (discountCode?.trim()) {
       const dateStr = new Date(start).toISOString().slice(0, 10);
       await addUsageRecord(
@@ -102,7 +103,8 @@ export async function POST(request: NextRequest) {
         dateStr,
         durationHours,
         `${name} ${dateStr}`,
-        studioId
+        studioId,
+        interviewGuests?.trim()
       );
     }
 

@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     }
 
     const summary = `[預約-付費] ${order.name}`;
-    const description = `聯絡方式：${order.contact}${order.note ? `\n備註：${order.note}` : ""}${order.discountCode ? `\n折扣碼：${order.discountCode}\n付費超出：${order.paidHours} 小時` : ""}`;
+    const description = `聯絡方式：${order.contact}${order.note ? `\n備註：${order.note}` : ""}${order.interviewGuests ? `\n訪談來賓：${order.interviewGuests}` : ""}${order.discountCode ? `\n折扣碼：${order.discountCode}\n付費超出：${order.paidHours} 小時` : ""}`;
 
     // 確保為 ISO 字串（試算表可能回傳不同格式）
     const startIso = new Date(order.start).toISOString();
@@ -82,7 +82,8 @@ export async function POST(request: NextRequest) {
         dateStr,
         durationHours,
         `${order.name} ${dateStr}（含付費 ${order.paidHours}h）`,
-        order.studio
+        order.studio,
+        order.interviewGuests
       );
     }
 
