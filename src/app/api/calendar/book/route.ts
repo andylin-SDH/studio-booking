@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const summary = `[錄音室預約] ${name}${interviewGuests?.trim() ? ` ${interviewGuests.trim()}` : ""}`;
+    const summary = `[錄音室預約] ${name}${interviewGuests?.trim() ? ` 訪談：${interviewGuests.trim()}` : ""}`;
     const description = `聯絡方式：${contact}${note ? `\n備註：${note}` : ""}${interviewGuests?.trim() ? `\n訪談來賓：${interviewGuests.trim()}` : ""}${discountCode?.trim() ? `\n折扣碼：${discountCode.trim()}` : ""}${includeInvoice ? "\n需開立發票：是" : ""}`;
 
     await createCalendarEvent(

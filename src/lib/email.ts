@@ -25,6 +25,8 @@ export interface BookingEmailParams {
   studioLabel: string;
   /** 訪談來賓（選填），用於 .ics 標題 */
   interviewGuests?: string;
+  /** 是否為付費預約，用於 .ics 標題前綴 */
+  isPaid?: boolean;
 }
 
 /** 需開立發票時，通知管理員（固定寄至 sandehao@gmail.com） */
@@ -53,12 +55,14 @@ function buildBookingIcs(params: {
   end: string;
   studioLabel: string;
   interviewGuests?: string;
+  isPaid?: boolean;
 }): string {
-  const { name, start, end, studioLabel, interviewGuests } = params;
+  const { name, start, end, studioLabel, interviewGuests, isPaid } = params;
+  const prefix = isPaid ? "[錄音室預約-付費]" : "[錄音室預約]";
   const uid = `${Date.now()}-${Math.random().toString(36).slice(2)}@sdh-corp.com`;
   const startUtc = new Date(start).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
   const endUtc = new Date(end).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
-  const summary = `[錄音室預約] ${name}${interviewGuests?.trim() ? ` ${interviewGuests.trim()}` : ""} ${studioLabel}`;
+  const summary = `${prefix} ${name}${interviewGuests?.trim() ? ` 訪談：${interviewGuests.trim()}` : ""}`;
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -86,11 +90,11 @@ export async function sendBookingConfirmation(params: BookingEmailParams): Promi
     return false;
   }
 
-  const { to, name, start, end, studioLabel, interviewGuests } = params;
+  const { to, name, start, end, studioLabel, interviewGuests, isPaid } = params;
   const startStr = formatDateTime(start);
   const endStr = formatDateTime(end);
 
-  const icsContent = buildBookingIcs({ name, start, end, studioLabel, interviewGuests });
+  const icsContent = buildBookingIcs({ name, start, end, studioLabel, interviewGuests, isPaid });
 
   const html = `
 <!DOCTYPE html>
