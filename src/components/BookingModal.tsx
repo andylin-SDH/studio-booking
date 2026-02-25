@@ -24,12 +24,13 @@ interface BookingModalProps {
   onSuccess: () => void;
 }
 
+type MonthlyRemaining = { yearMonth: string; label: string; used: number; remaining: number };
+
 type DiscountInfo = {
   valid: true;
   kolName: string;
   hoursPerMonth: number;
-  usedThisMonth: number;
-  remainingHours: number;
+  monthlyRemaining: MonthlyRemaining[];
 } | { valid: false; error?: string } | null;
 
 export function BookingModal({
@@ -75,8 +76,7 @@ export function BookingModal({
           valid: true,
           kolName: data.kolName,
           hoursPerMonth: data.hoursPerMonth,
-          usedThisMonth: data.usedThisMonth,
-          remainingHours: data.remainingHours,
+          monthlyRemaining: data.monthlyRemaining ?? [],
         });
       } else {
         setDiscountInfo({
@@ -247,16 +247,28 @@ export function BookingModal({
                 {validating ? "查詢中…" : "查詢折扣碼剩餘時數"}
               </button>
             </div>
-            {discountInfo?.valid && (
-              <p className="mt-2 text-sm text-green-600">
-                親愛的『{discountInfo.kolName}』老師您好，本月錄音室剩餘時數為{" "}
-                {discountInfo.remainingHours.toFixed(1)} 小時
-                {discountInfo.remainingHours < durationHours && (
-                  <span className="block mt-1 text-amber-600">
-                    超出部分將以綠界金流付費
-                  </span>
-                )}
-              </p>
+            {discountInfo?.valid && discountInfo.monthlyRemaining?.length > 0 && (
+              <div className="mt-2 text-sm text-green-600">
+                <p className="mb-1.5">親愛的『{discountInfo.kolName}』老師您好，各月份剩餘時數：</p>
+                <ul className="space-y-0.5">
+                  {discountInfo.monthlyRemaining.map((m) => {
+                    const bookingMonth = format(start, "yyyy-MM");
+                    const isBookingMonth = m.yearMonth === bookingMonth;
+                    const needsPayment = isBookingMonth && m.remaining < durationHours;
+                    return (
+                      <li key={m.yearMonth} className={isBookingMonth ? "font-medium" : ""}>
+                        {m.label}：{m.remaining.toFixed(1)} 小時
+                        {m.used > 0 && (
+                          <span className="ml-1 text-slate-500">（已用 {m.used.toFixed(1)}h）</span>
+                        )}
+                        {needsPayment && (
+                          <span className="ml-1 text-amber-600">· 本次超出部分將以綠界金流付費</span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
             )}
             {discountInfo && !discountInfo.valid && (
               <p className="mt-2 text-sm text-amber-600">{discountInfo.error}</p>

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getKolByCode } from "@/lib/google-sheet";
-import { getMonthlyUsage } from "@/lib/google-sheet";
+import { addMonths, format } from "date-fns";
+import { zhTW } from "date-fns/locale";
+import { getKolByCode, getMonthlyUsage } from "@/lib/google-sheet";
+
+/** 可預約的月份數（與行事曆一致） */
+const MAX_BOOKING_MONTHS_AHEAD = 2;
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code")?.trim();
@@ -16,16 +20,22 @@ export async function GET(request: NextRequest) {
       });
     }
     const now = new Date();
-    const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    const usedThisMonth = await getMonthlyUsage(code, yearMonth);
-    const remaining = Math.max(0, kol.hoursPerMonth - usedThisMonth);
+    const monthlyRemaining: { yearMonth: string; label: string; used: number; remaining: number }[] = [];
+
+    for (let i = 0; i <= MAX_BOOKING_MONTHS_AHEAD; i++) {
+      const d = addMonths(now, i);
+      const yearMonth = format(d, "yyyy-MM");
+      const label = format(d, "M 月", { locale: zhTW });
+      const used = await getMonthlyUsage(code, yearMonth);
+      const remaining = Math.max(0, kol.hoursPerMonth - used);
+      monthlyRemaining.push({ yearMonth, label, used, remaining });
+    }
 
     return NextResponse.json({
       valid: true,
       kolName: kol.name,
       hoursPerMonth: kol.hoursPerMonth,
-      usedThisMonth,
-      remainingHours: remaining,
+      monthlyRemaining,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
