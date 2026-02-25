@@ -42,33 +42,33 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#0c0f14]">
+    <div className="min-h-screen bg-[#0c0f14] overflow-x-hidden">
       {/* 導覽 */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0c0f14]/90 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
-          <a href="#" className="flex items-center gap-3">
+        <div className="mx-auto max-w-5xl px-3 py-3 sm:flex sm:h-16 sm:items-center sm:justify-between sm:px-4 sm:py-0">
+          <a href="#" className="flex items-center gap-2 sm:gap-3">
             <img
               src="/logo.png"
               alt="SDI 盛德好"
-              className="h-8 w-auto object-contain"
+              className="h-7 w-auto object-contain sm:h-8"
             />
-            <span className="text-lg font-bold tracking-tight text-white">
+            <span className="whitespace-nowrap text-base font-bold tracking-tight text-white sm:text-lg">
               <span className="gradient-text">錄音室 · 預約</span>
             </span>
           </a>
-          <nav className="flex gap-8 text-sm">
-            <a href="#space" className="text-slate-400 transition hover:text-amber-400">空間介紹</a>
-            <a href="#venue" className="text-slate-400 transition hover:text-amber-400">場地介紹</a>
-            <a href="#rules" className="text-slate-400 transition hover:text-amber-400">使用需知</a>
-            <a href="#calendar" className="text-slate-400 transition hover:text-amber-400">預約時段</a>
+          <nav className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-slate-400 sm:mt-0 sm:gap-8 sm:text-sm">
+            <a href="#space" className="transition hover:text-amber-400">空間介紹</a>
+            <a href="#venue" className="transition hover:text-amber-400">場地介紹</a>
+            <a href="#rules" className="transition hover:text-amber-400">使用需知</a>
+            <a href="#calendar" className="transition hover:text-amber-400">預約時段</a>
           </nav>
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-4 py-12">
+      <main className="mx-auto max-w-5xl px-3 py-8 sm:px-4 sm:py-12">
         {/* 1. 空間介紹 */}
-        <section id="space" className="mb-24">
-          <h2 className="mb-8 text-3xl font-bold tracking-tight text-white">
+        <section id="space" className="mb-16 sm:mb-24">
+          <h2 className="mb-6 text-2xl font-bold tracking-tight text-white sm:mb-8 sm:text-3xl">
             空間介紹
           </h2>
           <div className="grid gap-5 md:grid-cols-3">
@@ -88,8 +88,8 @@ export default function Home() {
         </section>
 
         {/* 2. 場地介紹（大間 / 小間） */}
-        <section id="venue" className="mb-24">
-          <h2 className="mb-8 text-3xl font-bold tracking-tight text-white">
+        <section id="venue" className="mb-16 sm:mb-24">
+          <h2 className="mb-6 text-2xl font-bold tracking-tight text-white sm:mb-8 sm:text-3xl">
             場地介紹
           </h2>
           <div className="grid gap-6 md:grid-cols-2">
@@ -124,11 +124,11 @@ export default function Home() {
         </section>
 
         {/* 3. 場地使用需知 */}
-        <section id="rules" className="mb-24">
-          <h2 className="mb-8 text-3xl font-bold tracking-tight text-white">
+        <section id="rules" className="mb-16 sm:mb-24">
+          <h2 className="mb-6 text-2xl font-bold tracking-tight text-white sm:mb-8 sm:text-3xl">
             場地使用需知
           </h2>
-          <div className="rounded-2xl border border-white/10 bg-slate-800/20 p-8 shadow-xl ring-1 ring-white/5">
+          <div className="rounded-2xl border border-white/10 bg-slate-800/20 p-5 shadow-xl ring-1 ring-white/5 sm:p-8">
             <div className="space-y-8">
               <div>
                 <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-amber-400">
@@ -165,8 +165,8 @@ export default function Home() {
         </section>
 
         {/* 4. 行事曆 + 預約 */}
-        <section id="calendar" className="mb-24">
-          <h2 className="mb-2 text-3xl font-bold tracking-tight text-white">
+        <section id="calendar" className="mb-16 sm:mb-24">
+          <h2 className="mb-2 text-xl font-bold tracking-tight text-white sm:text-3xl">
             空間使用狀況 · 選擇預約時段
           </h2>
           <p className="mb-4 text-amber-400">
@@ -199,7 +199,7 @@ export default function Home() {
               </button>
             ))}
           </div>
-          <div className="rounded-2xl border border-white/10 bg-slate-800/20 p-6 ring-1 ring-white/5">
+          <div className="rounded-2xl border border-white/10 bg-slate-800/20 p-3 ring-1 ring-white/5 sm:p-6">
             <CalendarSection
               studio={studio}
               selectedDate={selectedDate}

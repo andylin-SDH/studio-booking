@@ -210,23 +210,23 @@ export function CalendarSection({
   return (
     <div className="space-y-6">
       {/* 月曆導覽 */}
-      <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4">
+      <div className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
         <button
           type="button"
           disabled={!canGoPrev}
           onClick={() => setCurrentMonth((m) => subMonths(m, 1))}
-          className="rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+          className="shrink-0 rounded-lg px-2 py-2 text-sm text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 sm:px-3"
         >
           ← 上個月
         </button>
-        <span className="text-lg font-semibold text-slate-800">
+        <span className="min-w-0 truncate text-center text-base font-semibold text-slate-800 sm:text-lg">
           {format(currentMonth, "yyyy 年 M 月", { locale: zhTW })}
         </span>
         <button
           type="button"
           disabled={!canGoNext}
           onClick={() => setCurrentMonth((m) => addMonths(m, 1))}
-          className="rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+          className="shrink-0 rounded-lg px-2 py-2 text-sm text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 sm:px-3"
         >
           下個月 →
         </button>
@@ -235,9 +235,10 @@ export function CalendarSection({
         僅可預約今日起 {MAX_BOOKING_MONTHS_AHEAD} 個月內
       </p>
 
-      {/* 月曆格子 + 圖例 */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-center text-sm font-medium text-slate-600">
+      {/* 月曆格子 + 圖例：小螢幕可橫向捲動 */}
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="min-w-[280px]">
+        <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-center text-xs font-medium text-slate-600 sm:text-sm">
           {["日", "一", "二", "三", "四", "五", "六"].map((d) => (
             <div key={d} className="py-2">
               {d}
@@ -275,7 +276,7 @@ export function CalendarSection({
                   type="button"
                   disabled={!selectable}
                   onClick={() => handleDateChange(selectable ? day : null)}
-                  className={`min-h-[52px] border-b border-r border-slate-100 p-2 text-left text-sm transition
+                  className={`min-h-[44px] border-b border-r border-slate-100 p-1.5 text-left text-sm transition sm:min-h-[52px] sm:p-2
                     ${inMonth ? "text-slate-800" : "text-slate-300"}
                     ${!selectable ? "cursor-not-allowed opacity-50" : "hover:bg-slate-50"}
                     ${selected ? "bg-sky-100 ring-2 ring-sky-500" : showUsage ? usageBg : ""}
@@ -297,7 +298,8 @@ export function CalendarSection({
             })}
           </div>
         ))}
-        <div className="flex flex-wrap items-center gap-4 border-t border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-600">
+        </div>
+        <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 sm:gap-4 sm:px-4">
           <span className="font-medium">當日使用狀況：</span>
           <span className="flex items-center gap-1.5">
             <span className="h-3 w-4 rounded border border-emerald-200 bg-emerald-50" />

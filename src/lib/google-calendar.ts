@@ -81,8 +81,6 @@ export interface CalendarEventInput {
   end: string;
   summary: string;
   description?: string;
-  /** 與會者 email，Google 會寄送行事曆邀請給這些人 */
-  attendees?: string[];
 }
 
 /**
@@ -133,26 +131,13 @@ export async function createCalendarEvent(
   studio: StudioId = "big"
 ): Promise<void> {
   const { calendar, calendarId } = getCalendarClient(studio);
-  const body: {
-    summary: string;
-    description?: string;
-    start: { dateTime: string; timeZone: string };
-    end: { dateTime: string; timeZone: string };
-    attendees?: { email: string }[];
-  } = {
-    summary: input.summary,
-    description: input.description,
-    start: { dateTime: input.start, timeZone: "Asia/Taipei" },
-    end: { dateTime: input.end, timeZone: "Asia/Taipei" },
-  };
-  if (input.attendees?.length) {
-    body.attendees = input.attendees
-      .filter((e) => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim()))
-      .map((email) => ({ email: email.trim() }));
-  }
   await calendar.events.insert({
     calendarId,
-    requestBody: body,
-    sendUpdates: body.attendees?.length ? "all" : undefined,
+    requestBody: {
+      summary: input.summary,
+      description: input.description,
+      start: { dateTime: input.start, timeZone: "Asia/Taipei" },
+      end: { dateTime: input.end, timeZone: "Asia/Taipei" },
+    },
   });
 }
