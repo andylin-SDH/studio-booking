@@ -158,14 +158,32 @@ export async function addUsageRecord(
   const { usage } = await getSheetTitles();
 
   const studioLabel = studio === "small" ? "小間" : studio === "big" ? "大間" : "";
+  const eventIdStr = eventId != null ? String(eventId).trim() : "";
 
-  await sheets.spreadsheets.values.append({
+  // 取得目前最後一列，用 update 明確寫入 A~G（append 有時 G 欄會漏寫）
+  const existing = await sheets.spreadsheets.values.get({
     spreadsheetId: sheetId,
     range: `${usage}!A:G`,
-    valueInputOption: "USER_ENTERED",
-    requestBody: {
-      values: [[code.trim(), dateStr, hoursUsed, summary, studioLabel, interviewGuests?.trim() || "", eventId ?? ""]],
-    },
+  });
+  const rows = (existing.data.values || []) as string[][];
+  const nextRow = rows.length + 1;
+
+  const range = `${usage}!A${nextRow}:G${nextRow}`;
+  const values = [
+    code.trim(),
+    dateStr,
+    hoursUsed,
+    summary,
+    studioLabel,
+    interviewGuests?.trim() || "",
+    eventIdStr,
+  ];
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: sheetId,
+    range,
+    valueInputOption: "RAW",
+    requestBody: { values: [values] },
   });
 }
 

@@ -141,7 +141,11 @@ export async function createCalendarEvent(
       end: { dateTime: input.end, timeZone: "Asia/Taipei" },
     },
   });
-  return res.data.id ?? "";
+  const eventId = (res.data && "id" in res.data ? res.data.id : null) ?? "";
+  if (!eventId) {
+    console.warn("[createCalendarEvent] API 未回傳 event id", { data: res.data });
+  }
+  return String(eventId);
 }
 
 /**
