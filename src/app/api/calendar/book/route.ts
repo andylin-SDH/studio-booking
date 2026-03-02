@@ -53,8 +53,8 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      const now = new Date();
-      const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      // 依預約的 start 日期取得「該月」額度（不是當月；避免 toISOString 時區轉換）
+      const yearMonth = start.slice(0, 7);
       const usedThisMonth = await getMonthlyUsage(discountCode.trim(), yearMonth);
       const remaining = kol.hoursPerMonth - usedThisMonth;
       const usableFree = Math.max(0, remaining); // 透支時不扣負數，僅付本次
