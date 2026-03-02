@@ -25,8 +25,8 @@ const DAY_START_HOUR = 9;
 const DAY_END_HOUR = 21;
 /** 最少起租時長（分鐘） */
 const MIN_DURATION_MINUTES = 60;
-/** 最多可預約到今天起的 N 個月內 */
-const MAX_BOOKING_MONTHS_AHEAD = 3;
+/** 最多可預約到今天起的 N 天內 */
+const MAX_BOOKING_DAYS_AHEAD = 90;
 
 type CalendarEvent = { start: string; end: string };
 
@@ -108,7 +108,7 @@ export function CalendarSection({
   }, [monthKey, studio, refreshTrigger]); // 切換月份、錄音室或預約成功後重新取得
 
   const maxDate = useMemo(
-    () => addMonths(new Date(), MAX_BOOKING_MONTHS_AHEAD),
+    () => addDays(new Date(), MAX_BOOKING_DAYS_AHEAD),
     []
   );
   const minMonth = startOfMonth(new Date());
@@ -232,7 +232,7 @@ export function CalendarSection({
         </button>
       </div>
       <p className="text-sm text-slate-500">
-        僅可預約今日起 {MAX_BOOKING_MONTHS_AHEAD} 個月內
+        僅可預約今日起 {MAX_BOOKING_DAYS_AHEAD} 天內
       </p>
 
       {/* 月曆格子 + 圖例：小螢幕可橫向捲動 */}

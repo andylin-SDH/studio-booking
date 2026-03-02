@@ -3,8 +3,8 @@ import { addMonths, format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { getKolByCode, getMonthlyUsage } from "@/lib/google-sheet";
 
-/** 可預約的月份數（與行事曆一致） */
-const MAX_BOOKING_MONTHS_AHEAD = 3;
+/** 可預約 90 天內，約 4 個月顯示剩餘額度 */
+const MONTHS_TO_SHOW = 4;
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code")?.trim();
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const now = new Date();
     const monthlyRemaining: { yearMonth: string; label: string; used: number; remaining: number }[] = [];
 
-    for (let i = 0; i <= MAX_BOOKING_MONTHS_AHEAD; i++) {
+    for (let i = 0; i < MONTHS_TO_SHOW; i++) {
       const d = addMonths(now, i);
       const yearMonth = format(d, "yyyy-MM");
       const label = format(d, "M 月", { locale: zhTW });
