@@ -160,7 +160,7 @@ export async function addUsageRecord(
   const studioLabel = studio === "small" ? "小間" : studio === "big" ? "大間" : "";
   const eventIdStr = eventId != null ? String(eventId).trim() : "";
 
-  // 取得目前最後一列，用 update 明確寫入 A~G（append 有時 G 欄會漏寫）
+  // 取得目前最後一列
   const existing = await sheets.spreadsheets.values.get({
     spreadsheetId: sheetId,
     range: `${usage}!A:G`,
@@ -168,22 +168,22 @@ export async function addUsageRecord(
   const rows = (existing.data.values || []) as string[][];
   const nextRow = rows.length + 1;
 
-  const range = `${usage}!A${nextRow}:G${nextRow}`;
-  const values = [
-    code.trim(),
-    dateStr,
-    hoursUsed,
-    summary,
-    studioLabel,
-    interviewGuests?.trim() || "",
-    eventIdStr,
-  ];
-
+  // 先寫入 A~F
   await sheets.spreadsheets.values.update({
     spreadsheetId: sheetId,
-    range,
+    range: `${usage}!A${nextRow}:F${nextRow}`,
     valueInputOption: "RAW",
-    requestBody: { values: [values] },
+    requestBody: {
+      values: [[code.trim(), dateStr, hoursUsed, summary, studioLabel, interviewGuests?.trim() || ""]],
+    },
+  });
+
+  // 再單獨寫入 G 欄（eventId），避免合併寫入時遺漏
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: sheetId,
+    range: `${usage}!G${nextRow}`,
+    valueInputOption: "RAW",
+    requestBody: { values: [[eventIdStr]] },
   });
 }
 

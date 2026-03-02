@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
 
     // 免付費預約（純折扣碼）沒有產生金額，不寄送開立發票通知信；僅付費訂單完成時於 ecpay/return 寄送
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, eventId });
   } catch (e) {
     console.error("Calendar book error:", e);
     const message = e instanceof Error ? e.message : "預約失敗";
