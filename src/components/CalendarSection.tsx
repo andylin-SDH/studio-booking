@@ -107,10 +107,10 @@ export function CalendarSection({
     };
   }, [monthKey, studio, refreshTrigger]); // 切換月份、錄音室或預約成功後重新取得
 
-  const maxDate = useMemo(
-    () => addDays(new Date(), MAX_BOOKING_DAYS_AHEAD),
-    []
-  );
+  const maxDate = useMemo(() => {
+    const today = startOfDay(new Date());
+    return addDays(today, MAX_BOOKING_DAYS_AHEAD);
+  }, []);
   const minMonth = startOfMonth(new Date());
   const maxMonth = startOfMonth(maxDate);
   const canGoPrev = currentMonth > minMonth;
@@ -251,7 +251,7 @@ export function CalendarSection({
               const inMonth = isSameMonth(day, currentMonth);
               const selected = selectedDate && isSameDay(day, selectedDate);
               const isPast = isBefore(startOfDay(day), startOfDay(new Date()));
-              const beyondMax = startOfDay(day) > maxDate;
+              const beyondMax = startOfDay(day) > startOfDay(maxDate);
               const selectable = inMonth && !isPast && !beyondMax;
               const bookedMins = inMonth ? (dailyUsage.get(format(day, "yyyy-MM-dd")) ?? 0) : 0;
               const ratio = totalMinutesPerDay > 0 ? bookedMins / totalMinutesPerDay : 0;
