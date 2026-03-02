@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     const endIso = new Date(order.end).toISOString();
     console.log("[ECPay Return] 建立行事曆", { start: startIso, end: endIso, studio: order.studio });
 
-    await createCalendarEvent(
+    const eventId = await createCalendarEvent(
       {
         start: startIso,
         end: endIso,
@@ -83,7 +83,8 @@ export async function POST(request: NextRequest) {
         durationHours,
         `${order.name} ${dateStr}（含付費 ${order.paidHours}h）`,
         order.studio,
-        order.interviewGuests
+        order.interviewGuests,
+        eventId
       );
     }
 

@@ -131,14 +131,26 @@ export async function getMonthlyUsage(
   return total;
 }
 
-/** 新增一筆使用記錄（含大小間、訪談來賓欄位） */
+/** 使用記錄含事件 ID（G 欄），供行事曆刪除時同步移除 */
+export interface UsageRecordWithEventId {
+  rowIndex: number; // 1-based
+  code: string;
+  dateStr: string;
+  hoursUsed: number;
+  summary: string;
+  studio: "big" | "small";
+  eventId: string;
+}
+
+/** 新增一筆使用記錄（含大小間、訪談來賓、事件 ID 欄位） */
 export async function addUsageRecord(
   code: string,
   dateStr: string,
   hoursUsed: number,
   summary: string,
   studio?: "big" | "small",
-  interviewGuests?: string
+  interviewGuests?: string,
+  eventId?: string
 ): Promise<void> {
   const auth = getAuth();
   const sheets = google.sheets({ version: "v4", auth });
@@ -149,10 +161,88 @@ export async function addUsageRecord(
 
   await sheets.spreadsheets.values.append({
     spreadsheetId: sheetId,
-    range: `${usage}!A:F`,
+    range: `${usage}!A:G`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
-      values: [[code.trim(), dateStr, hoursUsed, summary, studioLabel, interviewGuests?.trim() || ""]],
+      values: [[code.trim(), dateStr, hoursUsed, summary, studioLabel, interviewGuests?.trim() || "", eventId ?? ""]],
+    },
+  });
+}
+
+/** 列出有事件 ID 的使用記錄（用於同步刪除檢查） */
+export async function listUsageRecordsWithEventId(): Promise<
+  UsageRecordWithEventId[]
+> {
+  const auth = getAuth();
+  const sheets = google.sheets({ version: "v4", auth });
+  const sheetId = getSheetId();
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
+  const { usage } = await getSheetTitles();
+
+  const usageSheet = (meta.data.sheets || []).find(
+    (s) => (s.properties?.title || "") === usage
+  );
+  if (!usageSheet?.properties?.sheetId) return [];
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range: `${usage}!A2:G`,
+  });
+  const rows = (res.data.values || []) as string[][];
+  const out: UsageRecordWithEventId[] = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const eventId = (row[6] || "").trim();
+    if (!eventId) continue;
+
+    const studioLabel = (row[4] || "").trim();
+    const studio: "big" | "small" =
+      studioLabel === "小間" ? "small" : "big";
+
+    out.push({
+      rowIndex: i + 2,
+      code: (row[0] || "").trim(),
+      dateStr: (row[1] || "").trim(),
+      hoursUsed: parseFloat(row[2] || "0") || 0,
+      summary: (row[3] || "").trim(),
+      studio,
+      eventId,
+    });
+  }
+  return out;
+}
+
+/** 刪除使用記錄的指定列（行事曆事件已刪除時同步） */
+export async function deleteUsageRecordRow(rowIndex: number): Promise<void> {
+  const auth = getAuth();
+  const sheets = google.sheets({ version: "v4", auth });
+  const sheetId = getSheetId();
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
+  const { usage } = await getSheetTitles();
+
+  const usageSheet = (meta.data.sheets || []).find(
+    (s) => (s.properties?.title || "") === usage
+  );
+  if (!usageSheet?.properties?.sheetId) {
+    throw new Error("找不到使用記錄工作表");
+  }
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: sheetId,
+    requestBody: {
+      requests: [
+        {
+          deleteDimension: {
+            range: {
+              sheetId: usageSheet.properties.sheetId,
+              dimension: "ROWS",
+              startIndex: rowIndex - 1,
+              endIndex: rowIndex,
+            },
+          },
+        },
+      ],
     },
   });
 }

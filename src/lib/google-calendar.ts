@@ -125,13 +125,14 @@ export async function getCalendarEvents(
 
 /**
  * 建立一筆預約事件到 Google 行事曆
+ * 回傳建立的事件 ID，供試算表使用記錄同步刪除時比對
  */
 export async function createCalendarEvent(
   input: CalendarEventInput,
   studio: StudioId = "big"
-): Promise<void> {
+): Promise<string> {
   const { calendar, calendarId } = getCalendarClient(studio);
-  await calendar.events.insert({
+  const res = await calendar.events.insert({
     calendarId,
     requestBody: {
       summary: input.summary,
@@ -140,4 +141,24 @@ export async function createCalendarEvent(
       end: { dateTime: input.end, timeZone: "Asia/Taipei" },
     },
   });
+  return res.data.id ?? "";
+}
+
+/**
+ * 檢查行事曆事件是否仍存在（未被刪除）
+ */
+export async function calendarEventExists(
+  eventId: string,
+  studio: StudioId
+): Promise<boolean> {
+  try {
+    const { calendar, calendarId } = getCalendarClient(studio);
+    const ev = await calendar.events.get({
+      calendarId,
+      eventId,
+    });
+    return (ev.data.status ?? "") !== "cancelled";
+  } catch {
+    return false; // 404 或已刪除
+  }
 }

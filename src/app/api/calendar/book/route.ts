@@ -90,12 +90,12 @@ export async function POST(request: NextRequest) {
     const summary = `[錄音室預約] ${name}${interviewGuests?.trim() ? ` 訪談：${interviewGuests.trim()}` : ""}`;
     const description = `聯絡方式：${contact}${note ? `\n備註：${note}` : ""}${interviewGuests?.trim() ? `\n訪談來賓：${interviewGuests.trim()}` : ""}${discountCode?.trim() ? `\n折扣碼：${discountCode.trim()}` : ""}${includeInvoice ? "\n需開立發票：是" : ""}`;
 
-    await createCalendarEvent(
+    const eventId = await createCalendarEvent(
       { start, end, summary, description },
       studioId
     );
 
-    // 若有折扣碼，寫入使用記錄（含大小間、訪談來賓）
+    // 若有折扣碼，寫入使用記錄（含大小間、訪談來賓、事件 ID）
     if (discountCode?.trim()) {
       const dateStr = new Date(start).toISOString().slice(0, 10);
       await addUsageRecord(
@@ -104,7 +104,8 @@ export async function POST(request: NextRequest) {
         durationHours,
         `${name} ${dateStr}`,
         studioId,
-        interviewGuests?.trim()
+        interviewGuests?.trim(),
+        eventId
       );
     }
 

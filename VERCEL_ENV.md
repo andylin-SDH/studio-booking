@@ -67,6 +67,18 @@
 
 ---
 
+## 行事曆刪除同步（選填）
+
+當您手動刪除 Google 行事曆上的預約事件時，系統會定期比對並移除對應的使用記錄，老師的額度會還回。
+
+| 變數名稱 | 說明 |
+|---------|------|
+| `CRON_SECRET` | 排程驗證密鑰。請設一組隨機字串（例如 `openssl rand -hex 32`）。若未設，排程仍會執行。 |
+
+Vercel Cron 會每小時呼叫 `/api/cron/sync-deleted-usage`。使用記錄需含 **事件 ID**（G 欄）才會被納入同步；新預約會自動寫入，舊記錄可手動補填或略過。
+
+---
+
 ## 完整清單（複製用）
 
 ```
@@ -82,6 +94,7 @@ ECPAY_SANDBOX=true
 NEXT_PUBLIC_APP_URL=https://你的專案.vercel.app
 RESEND_API_KEY=
 EMAIL_FROM=盛德好錄音室 <andylin@sdh-corp.com>
+CRON_SECRET=
 ```
 
 填入實際值後貼到 Vercel 環境變數即可。

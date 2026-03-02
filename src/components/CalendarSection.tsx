@@ -26,7 +26,7 @@ const DAY_END_HOUR = 21;
 /** 最少起租時長（分鐘） */
 const MIN_DURATION_MINUTES = 60;
 /** 最多可預約到今天起的 N 個月內 */
-const MAX_BOOKING_MONTHS_AHEAD = 2;
+const MAX_BOOKING_MONTHS_AHEAD = 3;
 
 type CalendarEvent = { start: string; end: string };
 

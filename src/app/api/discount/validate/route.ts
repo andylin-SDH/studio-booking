@@ -4,7 +4,7 @@ import { zhTW } from "date-fns/locale";
 import { getKolByCode, getMonthlyUsage } from "@/lib/google-sheet";
 
 /** 可預約的月份數（與行事曆一致） */
-const MAX_BOOKING_MONTHS_AHEAD = 2;
+const MAX_BOOKING_MONTHS_AHEAD = 3;
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code")?.trim();
