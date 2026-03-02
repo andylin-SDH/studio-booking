@@ -80,7 +80,7 @@ npm run dev
 
 若既有使用記錄僅有 4 欄，請在試算表中新增第 5 欄標題「大小間」、第 6 欄「訪談來賓」、第 7 欄「事件ID」（供行事曆刪除同步用，新預約會自動填寫）。
 
-**行事曆刪除同步**：若您手動刪除 Google 行事曆上的預約，Vercel Cron 會每小時比對並移除對應的使用記錄，老師的時數會還回。需在 Vercel 設定 `CRON_SECRET`（見 VERCEL_ENV.md）。
+**行事曆刪除同步**：若您手動刪除 Google 行事曆上的預約，Vercel Cron 會每天凌晨 5 點比對並移除對應的使用記錄，老師的時數會還回。需在 Vercel 設定 `CRON_SECRET`（見 VERCEL_ENV.md）。
 
 付費計費：每小時 500 元、每半小時 250 元；開立發票時加 5% 稅金。若啟用綠界 ECPay 付費（KOL 額度不足時），請設定 ECPAY_* 環境變數，並在試算表新增工作表「待付款訂單」，第 1 列標題：`orderId | start | end | durationMinutes | name | contact | note | discountCode | studio | paidHours | amount | status | createdAt | includeInvoice`（最後一欄記錄是否需開立發票，有勾選時為「是」）。當使用者勾選需開立發票時，系統會另寄一封通知信至 sandehao@gmail.com。
 

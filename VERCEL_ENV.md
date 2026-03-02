@@ -75,7 +75,7 @@
 |---------|------|
 | `CRON_SECRET` | 排程驗證密鑰。請設一組隨機字串（例如 `openssl rand -hex 32`）。若未設，排程仍會執行。 |
 
-Vercel Cron 會每小時呼叫 `/api/cron/sync-deleted-usage`。使用記錄需含 **事件 ID**（G 欄）才會被納入同步；新預約會自動寫入，舊記錄可手動補填或略過。
+Vercel Cron 會每天凌晨 5 點呼叫 `/api/cron/sync-deleted-usage`。使用記錄需含 **事件 ID**（G 欄）才會被納入同步；新預約會自動寫入，舊記錄可手動補填或略過。
 
 ---
 

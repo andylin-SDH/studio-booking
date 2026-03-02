@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/sync-deleted-usage",
-      "schedule": "0 * * * *"
+      "schedule": "0 5 * * *"
     }
   ]
 }
