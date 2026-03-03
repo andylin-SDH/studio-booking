@@ -57,6 +57,8 @@ const KOL_SHEET = process.env.GOOGLE_SHEET_KOL_SHEET || "KOL名單";
 const USAGE_SHEET = process.env.GOOGLE_SHEET_USAGE_SHEET || "使用記錄";
 const PENDING_SHEET =
   process.env.GOOGLE_SHEET_PENDING_SHEET || "待付款訂單";
+const CANCELLED_SHEET =
+  process.env.GOOGLE_SHEET_CANCELLED_SHEET || "取消紀錄";
 
 /** 取得工作表實際標題（依順序：第一個=KOL、第二個=使用記錄） */
 async function getSheetTitles(): Promise<{ kol: string; usage: string }> {
@@ -229,6 +231,60 @@ export async function listUsageRecordsWithEventId(): Promise<
     });
   }
   return out;
+}
+
+/** 取消紀錄欄位 */
+export interface CancelledUsageLogInput {
+  code: string;
+  dateStr: string;
+  hoursUsed: number;
+  summary: string;
+  studio: "big" | "small";
+  eventId: string;
+  source: "manual" | "cron";
+}
+
+async function getCancelledSheetName(): Promise<string> {
+  const auth = getAuth();
+  const sheets = google.sheets({ version: "v4", auth });
+  const sheetId = getSheetId();
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
+  const titles = (meta.data.sheets || []).map((s) => s.properties?.title || "");
+  // 若找不到就預設使用第 4 個工作表名稱（index 3）或 CANCELLED_SHEET
+  return titles.includes(CANCELLED_SHEET)
+    ? CANCELLED_SHEET
+    : titles[3] || CANCELLED_SHEET;
+}
+
+/** 寫入一筆取消紀錄（不影響原本使用記錄） */
+export async function logCancelledUsage(
+  input: CancelledUsageLogInput
+): Promise<void> {
+  const auth = getAuth();
+  const sheets = google.sheets({ version: "v4", auth });
+  const sheetId = getSheetId();
+  const sheetName = await getCancelledSheetName();
+
+  // 欄位建議：code | date | hours | summary | studio | eventId | source | cancelledAt
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: sheetId,
+    range: `${sheetName}!A:H`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [
+        [
+          input.code,
+          input.dateStr,
+          input.hoursUsed,
+          input.summary,
+          input.studio === "small" ? "小間" : "大間",
+          input.eventId,
+          input.source,
+          new Date().toISOString(),
+        ],
+      ],
+    },
+  });
 }
 
 /** 刪除使用記錄的指定列（行事曆事件已刪除時同步） */

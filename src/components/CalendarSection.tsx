@@ -35,6 +35,7 @@ interface CalendarSectionProps {
   selectedDate: Date | null;
   onSelectDate: (date: Date | null) => void;
   onSelectSlot: (start: Date, end: Date) => void;
+  onOpenDiscountManage?: () => void;
 }
 
 export function CalendarSection({
@@ -42,6 +43,7 @@ export function CalendarSection({
   selectedDate,
   onSelectDate,
   onSelectSlot,
+  onOpenDiscountManage,
 }: CalendarSectionProps) {
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -231,9 +233,20 @@ export function CalendarSection({
           下個月 →
         </button>
       </div>
-      <p className="text-sm text-slate-500">
-        僅可預約今日起 {MAX_BOOKING_DAYS_AHEAD} 天內
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {onOpenDiscountManage && (
+          <button
+            type="button"
+            onClick={onOpenDiscountManage}
+            className="rounded-full border border-amber-400/80 bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-200 shadow-sm shadow-amber-500/30 hover:bg-amber-500/30 hover:border-amber-300"
+          >
+            老師查詢／取消預約
+          </button>
+        )}
+        <p className="text-sm text-slate-500">
+          僅可預約今日起 {MAX_BOOKING_DAYS_AHEAD} 天內
+        </p>
+      </div>
 
       {/* 月曆格子 + 圖例：小螢幕可橫向捲動 */}
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">

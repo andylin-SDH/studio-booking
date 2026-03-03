@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   listUsageRecordsWithEventId,
   deleteUsageRecordRow,
+  logCancelledUsage,
 } from "@/lib/google-sheet";
 import { calendarEventExists } from "@/lib/google-calendar";
 
@@ -22,19 +23,30 @@ export async function GET(request: NextRequest) {
 
   try {
     const records = await listUsageRecordsWithEventId();
-    const toDelete: number[] = [];
+    const toDelete: { rowIndex: number; idx: number }[] = [];
 
-    for (const rec of records) {
+    for (let i = 0; i < records.length; i++) {
+      const rec = records[i];
       const exists = await calendarEventExists(rec.eventId, rec.studio);
       if (!exists) {
-        toDelete.push(rec.rowIndex);
+        toDelete.push({ rowIndex: rec.rowIndex, idx: i });
       }
     }
 
-    // 由下往上刪除，避免列索引偏移
-    toDelete.sort((a, b) => b - a);
-    for (const rowIndex of toDelete) {
-      await deleteUsageRecordRow(rowIndex);
+    // 由下往上刪除，避免列索引偏移；同時記住原本的 record 內容
+    toDelete.sort((a, b) => b.rowIndex - a.rowIndex);
+    for (const item of toDelete) {
+      const rec = records[item.idx];
+      await logCancelledUsage({
+        code: rec.code,
+        dateStr: rec.dateStr,
+        hoursUsed: rec.hoursUsed,
+        summary: rec.summary,
+        studio: rec.studio,
+        eventId: rec.eventId,
+        source: "cron",
+      });
+      await deleteUsageRecordRow(item.rowIndex);
     }
 
     return NextResponse.json({

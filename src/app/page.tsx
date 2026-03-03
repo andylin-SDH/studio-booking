@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { CalendarSection } from "@/components/CalendarSection";
 import { BookingModal } from "@/components/BookingModal";
+import { DiscountManageModal } from "@/components/DiscountManageModal";
 import { STUDIOS, type StudioId } from "@/lib/studios";
 
 const SPACE_IMAGES = [
@@ -16,6 +17,7 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<{ start: Date; end: Date; durationMinutes: number } | null>(null);
   const [showBookingModal, setShowBookingModal] = useState(false);
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
 
   const handleSelectSlot = useCallback((start: Date, end: Date) => {
     const durationMinutes = Math.round((end.getTime() - start.getTime()) / 60000);
@@ -205,6 +207,7 @@ export default function Home() {
               selectedDate={selectedDate}
               onSelectDate={setSelectedDate}
               onSelectSlot={handleSelectSlot}
+              onOpenDiscountManage={() => setShowDiscountModal(true)}
             />
           </div>
         </section>
@@ -219,6 +222,10 @@ export default function Home() {
           onClose={handleCloseBooking}
           onSuccess={handleBookingSuccess}
         />
+      )}
+
+      {showDiscountModal && (
+        <DiscountManageModal onClose={() => setShowDiscountModal(false)} />
       )}
 
       <footer className="border-t border-white/10 bg-[#0c0f14] py-8">

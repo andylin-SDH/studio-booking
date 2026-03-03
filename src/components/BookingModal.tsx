@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { STUDIOS } from "@/lib/studios";
 import { zhTW } from "date-fns/locale";
@@ -26,12 +26,24 @@ interface BookingModalProps {
 
 type MonthlyRemaining = { yearMonth: string; label: string; used: number; remaining: number };
 
-type DiscountInfo = {
-  valid: true;
-  kolName: string;
-  hoursPerMonth: number;
-  monthlyRemaining: MonthlyRemaining[];
-} | { valid: false; error?: string } | null;
+type FutureBooking = {
+  date: string;
+  hours: number;
+  studio: "big" | "small";
+  eventId: string;
+  summary: string;
+};
+
+type DiscountInfo =
+  | {
+      valid: true;
+      kolName: string;
+      hoursPerMonth: number;
+      monthlyRemaining: MonthlyRemaining[];
+      futureBookings: FutureBooking[];
+    }
+  | { valid: false; error?: string }
+  | null;
 
 export function BookingModal({
   studio,
@@ -51,8 +63,21 @@ export function BookingModal({
   const [includeInvoice, setIncludeInvoice] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+  const [selectedUsageMonth, setSelectedUsageMonth] = useState<string | null>(null);
+  const [cancelingEventId, setCancelingEventId] = useState<string | null>(null);
 
   const durationHours = durationMinutes / 60;
+
+  // 折扣碼查詢完成後，預設選擇「本次預約所在月份」作為已預約列表的分頁
+  useEffect(() => {
+    if (discountInfo && discountInfo.valid && discountInfo.monthlyRemaining.length > 0) {
+      const bookingMonth = format(start, "yyyy-MM");
+      const match = discountInfo.monthlyRemaining.find((m) => m.yearMonth === bookingMonth);
+      setSelectedUsageMonth((match ?? discountInfo.monthlyRemaining[0]).yearMonth);
+    } else {
+      setSelectedUsageMonth(null);
+    }
+  }, [discountInfo, start]);
 
   const handleValidateDiscount = async () => {
     const code = discountCode.trim();
@@ -78,6 +103,7 @@ export function BookingModal({
           kolName: data.kolName,
           hoursPerMonth: data.hoursPerMonth,
           monthlyRemaining: data.monthlyRemaining ?? [],
+          futureBookings: data.futureBookings ?? [],
         });
       } else {
         setDiscountInfo({
@@ -92,6 +118,44 @@ export function BookingModal({
       });
     } finally {
       setValidating(false);
+    }
+  };
+
+  const handleCancelBooking = async (booking: FutureBooking) => {
+    if (!discountCode.trim()) return;
+    const ok = window.confirm(
+      `確定要取消 ${booking.date} 的預約（${booking.hours.toFixed(
+        1
+      )} 小時）嗎？將會同步從行事曆刪除並歸還時數。`
+    );
+    if (!ok) return;
+    setCancelingEventId(booking.eventId);
+    try {
+      const res = await fetch("/api/discount/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: discountCode.trim(),
+          eventId: booking.eventId,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMessage({
+          type: "error",
+          text: data.error || "取消預約失敗，請稍後再試。",
+        });
+        return;
+      }
+      await handleValidateDiscount();
+      setMessage({ type: "ok", text: "已取消該預約並歸還時數。" });
+    } catch {
+      setMessage({
+        type: "error",
+        text: "取消預約失敗，請稍後再試。",
+      });
+    } finally {
+      setCancelingEventId(null);
     }
   };
 
@@ -189,6 +253,15 @@ export function BookingModal({
     }
   };
 
+  const selectedMonthBookings: FutureBooking[] =
+    discountInfo && discountInfo.valid && discountInfo.futureBookings && selectedUsageMonth
+      ? discountInfo.futureBookings.filter((b) => b.date.startsWith(selectedUsageMonth))
+      : [];
+  const selectedMonthMeta =
+    discountInfo && discountInfo.valid && selectedUsageMonth
+      ? discountInfo.monthlyRemaining.find((m) => m.yearMonth === selectedUsageMonth) || null
+      : null;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
@@ -257,30 +330,75 @@ export function BookingModal({
                 disabled={!discountCode.trim() || validating}
                 className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
-                {validating ? "查詢中…" : "查詢折扣碼剩餘時數"}
+                {validating ? "查詢中…" : "查詢時數與取消"}
               </button>
             </div>
+            {/* 剩餘時數改放在下方卡片中顯示 */}
             {discountInfo?.valid && discountInfo.monthlyRemaining?.length > 0 && (
-              <div className="mt-2 text-sm text-green-600">
-                <p className="mb-1.5">親愛的『{discountInfo.kolName}』老師您好，各月份剩餘時數：</p>
-                <ul className="space-y-0.5">
-                  {discountInfo.monthlyRemaining.map((m) => {
-                    const bookingMonth = format(start, "yyyy-MM");
-                    const isBookingMonth = m.yearMonth === bookingMonth;
-                    const needsPayment = isBookingMonth && m.remaining < durationHours;
-                    return (
-                      <li key={m.yearMonth} className={isBookingMonth ? "font-medium" : ""}>
-                        {m.label}：{m.remaining.toFixed(1)} 小時
-                        {m.used > 0 && (
-                          <span className="ml-1 text-slate-500">（已用 {m.used.toFixed(1)}h）</span>
-                        )}
-                        {needsPayment && (
-                          <span className="ml-1 text-amber-600">· 本次超出部分將以綠界金流付費</span>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
+              <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 shadow-inner">
+                <div className="mb-2 flex flex-wrap gap-1">
+                  {discountInfo.monthlyRemaining.map((m) => (
+                    <button
+                      key={m.yearMonth}
+                      type="button"
+                      onClick={() => setSelectedUsageMonth(m.yearMonth)}
+                      className={`rounded-full border px-2.5 py-1 text-xs ${
+                        selectedUsageMonth === m.yearMonth
+                          ? "border-sky-600 bg-sky-600 text-white"
+                          : "border-slate-200 bg-white text-slate-700"
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+                {selectedMonthMeta && (
+                  <p className="mb-2 text-[11px] text-slate-600 sm:text-xs">
+                    {selectedMonthMeta.label}：剩餘{" "}
+                    <span className="font-semibold text-emerald-600">
+                      {selectedMonthMeta.remaining.toFixed(1)} 小時
+                    </span>{" "}
+                    · 已用 {selectedMonthMeta.used.toFixed(1)}h / 每月{" "}
+                    {discountInfo.hoursPerMonth.toFixed(1)}h
+                    {selectedMonthMeta.yearMonth === format(start, "yyyy-MM") &&
+                      selectedMonthMeta.remaining < durationHours && (
+                        <span className="ml-1 text-amber-600">
+                          （本次超出部分將以綠界金流付費）
+                        </span>
+                      )}
+                  </p>
+                )}
+                <div className="space-y-1">
+                  {selectedMonthBookings.length === 0 ? (
+                    <p className="text-slate-500">本月尚無已預約時段。</p>
+                  ) : (
+                    selectedMonthBookings.map((b) => {
+                      const d = new Date(`${b.date}T00:00:00`);
+                      const dateLabel = format(d, "M/d (EEE)", { locale: zhTW });
+                      const studioLabel = STUDIOS[b.studio];
+                      return (
+                        <div
+                          key={b.eventId}
+                          className="flex items-center justify-between gap-2"
+                        >
+                          <div className="flex-1">
+                            <span>
+                              {dateLabel} · {studioLabel} · {b.hours.toFixed(1)} 小時
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleCancelBooking(b)}
+                            disabled={cancelingEventId === b.eventId}
+                            className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                          >
+                            {cancelingEventId === b.eventId ? "取消中…" : "取消"}
+                          </button>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             )}
             {discountInfo && !discountInfo.valid && (

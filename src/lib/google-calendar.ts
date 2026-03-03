@@ -169,3 +169,18 @@ export async function calendarEventExists(
     return false; // 404 或已刪除
   }
 }
+
+/**
+ * 刪除一筆行事曆事件（用於人工取消預約）
+ */
+export async function deleteCalendarEvent(
+  eventId: string,
+  studio: StudioId
+): Promise<void> {
+  const { calendar, calendarId } = getCalendarClient(studio);
+  await calendar.events.delete({
+    calendarId,
+    eventId,
+  });
+}
+
