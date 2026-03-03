@@ -123,6 +123,10 @@ export default function Home() {
               </p>
             </div>
           </div>
+          <div className="mt-6 rounded-xl border border-amber-500/15 bg-amber-950/20 px-4 py-3 text-slate-300">
+            <span className="font-medium text-amber-400">地址：</span>
+            台北市中山區撫順街2號9樓
+          </div>
         </section>
 
         {/* 3. 場地使用需知 */}
@@ -230,7 +234,7 @@ export default function Home() {
 
       <footer className="border-t border-white/10 bg-[#0c0f14] py-8">
         <div className="mx-auto max-w-5xl px-4 text-center text-sm text-slate-500">
-          盛德好錄音室預約系統 · 時段以 Google 行事曆為準
+          盛德好錄音室預約系統 · 台北市中山區撫順街2號9樓 · 時段以 Google 行事曆為準
         </div>
       </footer>
     </div>
