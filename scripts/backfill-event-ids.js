@@ -140,10 +140,7 @@ async function findEventIdForRow(calendar, studioId, code, dateStr, hours) {
     const summary = (ev.summary || "").toString();
     const desc = (ev.description || "").toString();
     // 只考慮系統建立的預約事件
-    if (
-      !summary.startsWith("[錄音室預約]") &&
-      !summary.startsWith("[錄音室預約-付費]")
-    ) {
+    if (!summary.startsWith("[錄音室預約")) {
       continue;
     }
     if (targetCode && !desc.toLowerCase().includes(targetCode)) {

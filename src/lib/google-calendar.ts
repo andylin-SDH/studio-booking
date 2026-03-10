@@ -124,6 +124,29 @@ export async function getCalendarEvents(
 }
 
 /**
+ * 檢查指定時段是否仍未被預約（與既有事件無重疊）
+ * 用於多人同時看同一時段時，僅允許先送出的那筆成立，後送出的會收到衝突錯誤
+ */
+export async function isSlotAvailable(
+  startISO: string,
+  endISO: string,
+  studio: StudioId = "big"
+): Promise<boolean> {
+  const fromDate = startISO.slice(0, 10);
+  const toDate = endISO.slice(0, 10);
+  const events = await getCalendarEvents(fromDate, toDate, studio);
+  const startMs = new Date(startISO).getTime();
+  const endMs = new Date(endISO).getTime();
+  for (const ev of events) {
+    const evStart = new Date(ev.start).getTime();
+    const evEnd = new Date(ev.end).getTime();
+    // 重疊：既有事件的開始 < 請求的結束 且 既有事件的結束 > 請求的開始
+    if (evStart < endMs && evEnd > startMs) return false;
+  }
+  return true;
+}
+
+/**
  * 建立一筆預約事件到 Google 行事曆
  * 回傳建立的事件 ID，供試算表使用記錄同步刪除時比對
  */

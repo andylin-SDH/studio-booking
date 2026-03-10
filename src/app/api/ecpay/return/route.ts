@@ -5,7 +5,7 @@ import {
   markPendingOrderCompleted,
   addUsageRecord,
 } from "@/lib/google-sheet";
-import { createCalendarEvent } from "@/lib/google-calendar";
+import { createCalendarEvent, isSlotAvailable } from "@/lib/google-calendar";
 import { sendBookingConfirmation, sendInvoiceNotificationToAdmin } from "@/lib/email";
 import { STUDIOS, type StudioId } from "@/lib/studios";
 
@@ -55,13 +55,27 @@ export async function POST(request: NextRequest) {
       return new NextResponse("1|OK");
     }
 
-    const summary = `[錄音室預約-付費] ${order.name}${order.interviewGuests?.trim() ? ` 訪談：${order.interviewGuests.trim()}` : ""}`;
+    const roomLabel = order.studio === "small" ? "小間" : "大間";
+    const summary = `[錄音室預約-付費-${roomLabel}] ${order.name}${order.interviewGuests?.trim() ? ` 訪談：${order.interviewGuests.trim()}` : ""}`;
     const description = `聯絡方式：${order.contact}${order.note ? `\n備註：${order.note}` : ""}${order.interviewGuests ? `\n訪談來賓：${order.interviewGuests}` : ""}${order.discountCode ? `\n折扣碼：${order.discountCode}\n付費超出：${order.paidHours} 小時` : ""}`;
 
     // 確保為 ISO 字串（試算表可能回傳不同格式）
     const startIso = new Date(order.start).toISOString();
     const endIso = new Date(order.end).toISOString();
     console.log("[ECPay Return] 建立行事曆", { start: startIso, end: endIso, studio: order.studio });
+
+    const stillAvailable = await isSlotAvailable(startIso, endIso, order.studio as StudioId);
+    if (!stillAvailable) {
+      console.error("[ECPay Return] 時段已被預約，不建立行事曆、不標記訂單完成，需人工處理", {
+        merchantTradeNo,
+        start: startIso,
+        end: endIso,
+        studio: order.studio,
+      });
+      return new NextResponse("1|OK", {
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
+    }
 
     const eventId = await createCalendarEvent(
       {

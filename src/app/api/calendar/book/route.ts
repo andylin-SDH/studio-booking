@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createCalendarEvent } from "@/lib/google-calendar";
+import { createCalendarEvent, isSlotAvailable } from "@/lib/google-calendar";
 import {
   getKolByCode,
   getMonthlyUsage,
@@ -87,7 +87,17 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const summary = `[錄音室預約] ${name}${interviewGuests?.trim() ? ` 訪談：${interviewGuests.trim()}` : ""}`;
+    // 下訂前最後一刻再查一次行事曆，避免多人同時下定同一時段
+    const stillAvailable = await isSlotAvailable(start, end, studioId);
+    if (!stillAvailable) {
+      return NextResponse.json(
+        { error: "該時段已被預約，請重新選擇時段或重新整理頁面查看最新狀況。" },
+        { status: 409 }
+      );
+    }
+
+    const roomLabel = studioId === "big" ? "大間" : "小間";
+    const summary = `[錄音室預約-${roomLabel}] ${name}${interviewGuests?.trim() ? ` 訪談：${interviewGuests.trim()}` : ""}`;
     const description = `聯絡方式：${contact}${note ? `\n備註：${note}` : ""}${interviewGuests?.trim() ? `\n訪談來賓：${interviewGuests.trim()}` : ""}${discountCode?.trim() ? `\n折扣碼：${discountCode.trim()}` : ""}${includeInvoice ? "\n需開立發票：是" : ""}`;
 
     const eventId = await createCalendarEvent(
