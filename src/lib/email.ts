@@ -53,12 +53,14 @@ function buildBookingIcs(params: {
   name: string;
   start: string;
   end: string;
+  studio: "big" | "small";
   studioLabel: string;
   interviewGuests?: string;
   isPaid?: boolean;
 }): string {
-  const { name, start, end, studioLabel, interviewGuests, isPaid } = params;
-  const prefix = isPaid ? "[錄音室預約-付費]" : "[錄音室預約]";
+  const { name, start, end, studio, studioLabel, interviewGuests, isPaid } = params;
+  const roomLabel = studio === "small" ? "小間" : "大間";
+  const prefix = isPaid ? `[錄音室預約-付費-${roomLabel}]` : `[錄音室預約-${roomLabel}]`;
   const uid = `${Date.now()}-${Math.random().toString(36).slice(2)}@sdh-corp.com`;
   const startUtc = new Date(start).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
   const endUtc = new Date(end).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
@@ -90,11 +92,11 @@ export async function sendBookingConfirmation(params: BookingEmailParams): Promi
     return false;
   }
 
-  const { to, name, start, end, studioLabel, interviewGuests, isPaid } = params;
+  const { to, name, start, end, studio, studioLabel, interviewGuests, isPaid } = params;
   const startStr = formatDateTime(start);
   const endStr = formatDateTime(end);
 
-  const icsContent = buildBookingIcs({ name, start, end, studioLabel, interviewGuests, isPaid });
+  const icsContent = buildBookingIcs({ name, start, end, studio, studioLabel, interviewGuests, isPaid });
 
   const html = `
 <!DOCTYPE html>
