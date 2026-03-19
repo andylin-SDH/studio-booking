@@ -6,9 +6,19 @@ import {
   getMonthlyUsage,
   listUsageRecordsWithEventId,
 } from "@/lib/google-sheet";
+import { getCalendarEventTimes } from "@/lib/google-calendar";
 
 /** 可預約 90 天內，約 4 個月顯示剩餘額度 */
 const MONTHS_TO_SHOW = 4;
+
+function formatTimeLabel(iso: string): string {
+  return new Date(iso).toLocaleTimeString("zh-TW", {
+    timeZone: "Asia/Taipei",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code")?.trim();
@@ -56,12 +66,24 @@ export async function GET(request: NextRequest) {
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
+    // 反查行事曆事件 start/end，讓老師知道要取消哪個「時段」
+    const futureBookingsWithTimes = await Promise.all(
+      futureBookings.map(async (b) => {
+        const times = await getCalendarEventTimes(b.eventId, b.studio);
+        if (!times) return b;
+        const timeSlot = `${formatTimeLabel(times.start)} - ${formatTimeLabel(
+          times.end
+        )}`;
+        return { ...b, timeSlot };
+      })
+    );
+
     return NextResponse.json({
       valid: true,
       kolName: kol.name,
       hoursPerMonth: kol.hoursPerMonth,
       monthlyRemaining,
-      futureBookings,
+      futureBookings: futureBookingsWithTimes,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

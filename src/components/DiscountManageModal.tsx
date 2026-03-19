@@ -13,6 +13,7 @@ type FutureBooking = {
   studio: StudioId;
   eventId: string;
   summary: string;
+  timeSlot?: string;
 };
 
 type DiscountInfo =
@@ -94,9 +95,9 @@ export function DiscountManageModal({ onClose }: DiscountManageModalProps) {
   const handleCancelBooking = async (booking: FutureBooking) => {
     if (!discountCode.trim()) return;
     const ok = window.confirm(
-      `確定要取消 ${booking.date} 的預約（${booking.hours.toFixed(
-        1
-      )} 小時）嗎？將會同步從行事曆刪除並歸還時數。`
+      `確定要取消 ${
+        booking.timeSlot ? `${booking.date}（${booking.timeSlot}）` : booking.date
+      } 的預約（${booking.hours.toFixed(1)} 小時）嗎？將會同步從行事曆刪除並歸還時數。`
     );
     if (!ok) return;
     setCancelingEventId(booking.eventId);
@@ -231,7 +232,9 @@ export function DiscountManageModal({ onClose }: DiscountManageModalProps) {
                       >
                         <div className="flex-1">
                           <span>
-                            {dateLabel} · {studioLabel} · {b.hours.toFixed(1)} 小時
+                          {dateLabel} · {studioLabel}
+                          {b.timeSlot ? ` · ${b.timeSlot}` : ""} ·{" "}
+                          {b.hours.toFixed(1)} 小時
                           </span>
                         </div>
                         <button

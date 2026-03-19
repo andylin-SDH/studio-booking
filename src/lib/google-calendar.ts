@@ -194,6 +194,40 @@ export async function calendarEventExists(
 }
 
 /**
+ * 依 eventId 取得事件時間（start/end），供「老師查詢／取消」顯示實際時段
+ */
+export async function getCalendarEventTimes(
+  eventId: string,
+  studio: StudioId
+): Promise<{ start: string; end: string } | null> {
+  try {
+    const { calendar, calendarId } = getCalendarClient(studio);
+    const ev = await calendar.events.get({
+      calendarId,
+      eventId,
+    });
+
+    const startRaw = ev.data.start?.dateTime ?? ev.data.start?.date;
+    const endRaw = ev.data.end?.dateTime ?? ev.data.end?.date;
+    if (!startRaw || !endRaw) return null;
+
+    // 全天事件(date) 轉為明確 Asia/Taipei 時間
+    const start =
+      typeof ev.data.start?.date === "string"
+        ? `${startRaw}T00:00:00+08:00`
+        : startRaw;
+    const end =
+      typeof ev.data.end?.date === "string"
+        ? `${endRaw}T00:00:00+08:00`
+        : endRaw;
+
+    return { start, end };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 刪除一筆行事曆事件（用於人工取消預約）
  */
 export async function deleteCalendarEvent(
