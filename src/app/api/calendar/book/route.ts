@@ -3,6 +3,7 @@ import { createCalendarEvent, isSlotAvailable } from "@/lib/google-calendar";
 import {
   getKolByCode,
   getMonthlyUsage,
+  getTotalUsage,
   addUsageRecord,
 } from "@/lib/google-sheet";
 import { sendBookingConfirmation } from "@/lib/email";
@@ -53,10 +54,21 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      // 依預約的 start 日期取得「該月」額度（不是當月；避免 toISOString 時區轉換）
-      const yearMonth = start.slice(0, 7);
-      const usedThisMonth = await getMonthlyUsage(discountCode.trim(), yearMonth);
-      const remaining = kol.hoursPerMonth - usedThisMonth;
+      const normalizedCode = discountCode.trim();
+      const hasOneTimeQuota =
+        typeof kol.oneTimeTotalHours === "number" && kol.oneTimeTotalHours > 0;
+      let remaining = 0;
+      let quotaLabel = "本月";
+      if (hasOneTimeQuota) {
+        const usedTotal = await getTotalUsage(normalizedCode);
+        remaining = kol.oneTimeTotalHours! - usedTotal;
+        quotaLabel = "總額度";
+      } else {
+        // 依預約的 start 日期取得「該月」額度（不是當月；避免 toISOString 時區轉換）
+        const yearMonth = start.slice(0, 7);
+        const usedThisMonth = await getMonthlyUsage(normalizedCode, yearMonth);
+        remaining = kol.hoursPerMonth - usedThisMonth;
+      }
       const usableFree = Math.max(0, remaining); // 透支時不扣負數，僅付本次
       if (usableFree < durationHours) {
         const paidHours = durationHours - usableFree;
@@ -65,7 +77,7 @@ export async function POST(request: NextRequest) {
           remainingHours: usableFree,
           paidHours,
           durationHours,
-          message: `本月剩餘 ${usableFree.toFixed(1)} 小時，本次 ${durationHours.toFixed(1)} 小時，超出 ${paidHours.toFixed(1)} 小時需付費`,
+          message: `${quotaLabel}剩餘 ${usableFree.toFixed(1)} 小時，本次 ${durationHours.toFixed(1)} 小時，超出 ${paidHours.toFixed(1)} 小時需付費`,
         });
       }
     } catch (e) {

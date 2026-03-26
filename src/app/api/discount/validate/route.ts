@@ -4,6 +4,7 @@ import { zhTW } from "date-fns/locale";
 import {
   getKolByCode,
   getMonthlyUsage,
+  getTotalUsage,
   listUsageRecordsWithEventId,
 } from "@/lib/google-sheet";
 import { getCalendarEventTimes } from "@/lib/google-calendar";
@@ -35,13 +36,21 @@ export async function GET(request: NextRequest) {
     }
     const now = new Date();
     const monthlyRemaining: { yearMonth: string; label: string; used: number; remaining: number }[] = [];
+    const hasOneTimeQuota =
+      typeof kol.oneTimeTotalHours === "number" && kol.oneTimeTotalHours > 0;
+    const totalUsed = hasOneTimeQuota ? await getTotalUsage(code) : 0;
+    const totalRemaining = hasOneTimeQuota
+      ? Math.max(0, kol.oneTimeTotalHours! - totalUsed)
+      : 0;
 
     for (let i = 0; i < MONTHS_TO_SHOW; i++) {
       const d = addMonths(now, i);
       const yearMonth = format(d, "yyyy-MM");
       const label = format(d, "M 月", { locale: zhTW });
-      const used = await getMonthlyUsage(code, yearMonth);
-      const remaining = Math.max(0, kol.hoursPerMonth - used);
+      const used = hasOneTimeQuota ? totalUsed : await getMonthlyUsage(code, yearMonth);
+      const remaining = hasOneTimeQuota
+        ? totalRemaining
+        : Math.max(0, kol.hoursPerMonth - used);
       monthlyRemaining.push({ yearMonth, label, used, remaining });
     }
 
@@ -81,7 +90,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       valid: true,
       kolName: kol.name,
-      hoursPerMonth: kol.hoursPerMonth,
+      hoursPerMonth: hasOneTimeQuota ? kol.oneTimeTotalHours! : kol.hoursPerMonth,
       monthlyRemaining,
       futureBookings: futureBookingsWithTimes,
     });

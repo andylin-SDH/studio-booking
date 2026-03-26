@@ -78,9 +78,11 @@ export interface KolRecord {
   name: string;
   code: string;
   hoursPerMonth: number; // 小時
+  /** 一次性總時數（選填）：有值時代表不走每月重置 */
+  oneTimeTotalHours?: number;
 }
 
-/** 依折扣碼查詢 KOL，不區分大小寫 */
+/** 依折扣碼查詢 KOL，不區分大小寫（D 欄可選：一次性總時數） */
 export async function getKolByCode(code: string): Promise<KolRecord | null> {
   const auth = getAuth();
   const sheets = google.sheets({ version: "v4", auth });
@@ -89,17 +91,28 @@ export async function getKolByCode(code: string): Promise<KolRecord | null> {
 
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: sheetId,
-    range: `${kol}!A2:C`,
+    range: `${kol}!A2:D`,
   });
   const rows = (res.data.values || []) as string[][];
   const normalized = code.trim().toLowerCase();
 
   for (const row of rows) {
-    const [name, c, hoursStr] = row;
+    const [name, c, hoursStr, oneTimeTotalHoursStr] = row;
     if (!c) continue;
     if (c.trim().toLowerCase() === normalized) {
       const hours = parseFloat(hoursStr || "0") || 0;
-      return { name: (name || "").trim(), code: c.trim(), hoursPerMonth: hours };
+      const oneTimeTotalHours =
+        oneTimeTotalHoursStr != null && String(oneTimeTotalHoursStr).trim() !== ""
+          ? parseFloat(String(oneTimeTotalHoursStr))
+          : NaN;
+      return {
+        name: (name || "").trim(),
+        code: c.trim(),
+        hoursPerMonth: hours,
+        oneTimeTotalHours: Number.isFinite(oneTimeTotalHours)
+          ? oneTimeTotalHours
+          : undefined,
+      };
     }
   }
   return null;
@@ -128,6 +141,29 @@ export async function getMonthlyUsage(
     if (!c || c.trim().toLowerCase() !== normalized) continue;
     const date = dateStr || "";
     if (!date.startsWith(yearMonth)) continue;
+    total += parseFloat(hoursStr || "0") || 0;
+  }
+  return total;
+}
+
+/** 取得某折扣碼歷史累計已使用時數（一次性總時數用） */
+export async function getTotalUsage(code: string): Promise<number> {
+  const auth = getAuth();
+  const sheets = google.sheets({ version: "v4", auth });
+  const sheetId = getSheetId();
+  const { usage } = await getSheetTitles();
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range: `${usage}!A2:D`,
+  });
+  const rows = (res.data.values || []) as string[][];
+  const normalized = code.trim().toLowerCase();
+  let total = 0;
+
+  for (const row of rows) {
+    const [c, , hoursStr] = row;
+    if (!c || c.trim().toLowerCase() !== normalized) continue;
     total += parseFloat(hoursStr || "0") || 0;
   }
   return total;
