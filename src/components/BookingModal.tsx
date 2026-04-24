@@ -417,6 +417,9 @@ export function BookingModal({
               需要開立發票（含 5% 稅金）
             </label>
           </div>
+          <p className="text-sm font-bold text-rose-600">
+            如需開立發票，請務必填寫抬頭統編於備註欄。
+          </p>
           <div>
             <label className="block text-sm font-medium text-slate-700">備註</label>
             <textarea
