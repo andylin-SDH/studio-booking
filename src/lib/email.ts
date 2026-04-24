@@ -112,7 +112,7 @@ export async function sendBookingConfirmation(params: BookingEmailParams): Promi
       <p style="margin:0 0 8px"><strong>開始時間</strong>：${startStr}</p>
       <p style="margin:0"><strong>結束時間</strong>：${endStr}</p>
     </div>
-    <p style="margin:16px 0 0;font-size:0.875rem;color:#64748b">如需修改，請聯繫官方Line@或您的經紀人夥伴。<br><a href="https://lin.ee/v3u8YDR" style="color:#0ea5e9">lin.ee/v3u8YDR</a></p>
+    <p style="margin:16px 0 0;font-size:0.875rem;color:#64748b">如需取消退款，請聯繫官方 Line@。<br><a href="https://lin.ee/v3u8YDR" style="color:#0ea5e9">https://lin.ee/v3u8YDR</a></p>
   </div>
 </body>
 </html>`;
