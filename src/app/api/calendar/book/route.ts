@@ -21,19 +21,51 @@ export async function POST(request: NextRequest) {
     discountCode?: string;
     studio?: string;
     includeInvoice?: boolean;
+    microphoneCount?: number;
+    invoiceTitle?: string;
+    invoiceTaxId?: string;
+    invoiceRecipientEmail?: string;
   };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "無效的請求內容" }, { status: 400 });
   }
-  const { start, end, name, contact, note, interviewGuests, discountCode, studio, includeInvoice } = body;
+  const {
+    start,
+    end,
+    name,
+    contact,
+    note,
+    interviewGuests,
+    discountCode,
+    studio,
+    includeInvoice,
+    microphoneCount,
+    invoiceTitle,
+    invoiceTaxId,
+    invoiceRecipientEmail,
+  } = body;
   const studioId = (studio === "small" ? "small" : "big") as import("@/lib/studios").StudioId;
-  if (!start || !end || !name || !contact) {
+  if (!start || !end || !name || !contact || !microphoneCount) {
     return NextResponse.json(
-      { error: "請提供 start、end、name、contact" },
+      { error: "請提供 start、end、name、contact、microphoneCount" },
       { status: 400 }
     );
+  }
+  if (microphoneCount < 1 || microphoneCount > 4) {
+    return NextResponse.json({ error: "需求麥克風數量需為 1~4" }, { status: 400 });
+  }
+  if (includeInvoice) {
+    if (!invoiceTitle?.trim() || !invoiceTaxId?.trim() || !invoiceRecipientEmail?.trim()) {
+      return NextResponse.json({ error: "勾選開立發票後，請填寫抬頭、統編與收件 Email" }, { status: 400 });
+    }
+    if (!/^\d{8}$/.test(invoiceTaxId.trim())) {
+      return NextResponse.json({ error: "統編格式需為 8 碼數字" }, { status: 400 });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(invoiceRecipientEmail.trim())) {
+      return NextResponse.json({ error: "請輸入有效的發票收件 Email" }, { status: 400 });
+    }
   }
   // 依 start/end 時間差計算時數（建議 client 傳 Asia/Taipei 格式如 2025-02-24T09:00:00+08:00）
   const startMs = new Date(start).getTime();
@@ -110,7 +142,12 @@ export async function POST(request: NextRequest) {
 
     const roomLabel = studioId === "big" ? "大間" : "小間";
     const summary = `[錄音室預約-${roomLabel}] ${name}${interviewGuests?.trim() ? ` 訪談：${interviewGuests.trim()}` : ""}`;
-    const description = `聯絡方式：${contact}${note ? `\n備註：${note}` : ""}${interviewGuests?.trim() ? `\n訪談來賓：${interviewGuests.trim()}` : ""}${discountCode?.trim() ? `\n折扣碼：${discountCode.trim()}` : ""}${includeInvoice ? "\n需開立發票：是" : ""}`;
+    const normalizedNote = note?.trim() || "";
+    const invoiceNote =
+      includeInvoice && invoiceTitle?.trim() && invoiceTaxId?.trim() && invoiceRecipientEmail?.trim()
+        ? `${normalizedNote ? `${normalizedNote}\n` : ""}發票抬頭：${invoiceTitle.trim()}\n統編：${invoiceTaxId.trim()}\n發票收件 Email：${invoiceRecipientEmail.trim()}`
+        : normalizedNote;
+    const description = `聯絡方式：${contact}\n需求麥克風數量：${microphoneCount} 支${invoiceNote ? `\n備註：${invoiceNote}` : ""}${interviewGuests?.trim() ? `\n訪談來賓：${interviewGuests.trim()}` : ""}${discountCode?.trim() ? `\n折扣碼：${discountCode.trim()}` : ""}${includeInvoice ? "\n需開立發票：是" : ""}`;
 
     const eventId = await createCalendarEvent(
       { start, end, summary, description },

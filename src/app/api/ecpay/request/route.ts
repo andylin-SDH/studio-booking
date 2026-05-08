@@ -28,6 +28,10 @@ export async function POST(request: NextRequest) {
     studio?: string;
     paidHours?: number;
     includeTax?: boolean;
+    microphoneCount?: number;
+    invoiceTitle?: string;
+    invoiceTaxId?: string;
+    invoiceRecipientEmail?: string;
   };
   try {
     body = await request.json();
@@ -46,13 +50,31 @@ export async function POST(request: NextRequest) {
     studio = "big",
     paidHours = 0,
     includeTax = false,
+    microphoneCount,
+    invoiceTitle = "",
+    invoiceTaxId = "",
+    invoiceRecipientEmail = "",
   } = body;
 
-  if (!start || !end || !name || !contact || paidHours <= 0) {
+  if (!start || !end || !name || !contact || paidHours <= 0 || !microphoneCount) {
     return NextResponse.json(
-      { error: "請提供 start、end、name、contact、paidHours" },
+      { error: "請提供 start、end、name、contact、paidHours、microphoneCount" },
       { status: 400 }
     );
+  }
+  if (microphoneCount < 1 || microphoneCount > 4) {
+    return NextResponse.json({ error: "需求麥克風數量需為 1~4" }, { status: 400 });
+  }
+  if (includeTax) {
+    if (!invoiceTitle.trim() || !invoiceTaxId.trim() || !invoiceRecipientEmail.trim()) {
+      return NextResponse.json({ error: "勾選開立發票後，請填寫抬頭、統編與收件 Email" }, { status: 400 });
+    }
+    if (!/^\d{8}$/.test(invoiceTaxId.trim())) {
+      return NextResponse.json({ error: "統編格式需為 8 碼數字" }, { status: 400 });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(invoiceRecipientEmail.trim())) {
+      return NextResponse.json({ error: "請輸入有效的發票收件 Email" }, { status: 400 });
+    }
   }
 
   // 依 start/end 計算實際時長（分鐘），不依賴前端
@@ -80,6 +102,17 @@ export async function POST(request: NextRequest) {
   const orderResultUrl = `${baseUrl}/pay/result`;
   const clientBackUrl = `${baseUrl}/#calendar`;
 
+  const normalizedNote = note.trim();
+  const mergedNote = [
+    normalizedNote,
+    `需求麥克風數量：${microphoneCount} 支`,
+    includeTax ? `發票抬頭：${invoiceTitle.trim()}` : "",
+    includeTax ? `統編：${invoiceTaxId.trim()}` : "",
+    includeTax ? `發票收件 Email：${invoiceRecipientEmail.trim()}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
   try {
     await addPendingOrder({
       orderId,
@@ -88,7 +121,7 @@ export async function POST(request: NextRequest) {
       durationMinutes,
       name: name.trim(),
       contact: contact.trim(),
-      note: note.trim(),
+      note: mergedNote,
       discountCode: discountCode.trim(),
       studio: studioId,
       paidHours,

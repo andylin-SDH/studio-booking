@@ -61,6 +61,10 @@ export function BookingModal({
   const [note, setNote] = useState("");
   const [interviewGuests, setInterviewGuests] = useState("");
   const [includeInvoice, setIncludeInvoice] = useState(false);
+  const [microphoneCount, setMicrophoneCount] = useState<string>("");
+  const [invoiceTitle, setInvoiceTitle] = useState("");
+  const [invoiceTaxId, setInvoiceTaxId] = useState("");
+  const [invoiceRecipientEmail, setInvoiceRecipientEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
   const [selectedUsageMonth, setSelectedUsageMonth] = useState<string | null>(null);
@@ -170,6 +174,24 @@ export function BookingModal({
       setMessage({ type: "error", text: "請輸入有效的 Email" });
       return;
     }
+    if (!microphoneCount) {
+      setMessage({ type: "error", text: "請選擇需求麥克風數量" });
+      return;
+    }
+    if (includeInvoice) {
+      if (!invoiceTitle.trim() || !invoiceTaxId.trim() || !invoiceRecipientEmail.trim()) {
+        setMessage({ type: "error", text: "勾選開立發票後，請填寫抬頭、統編與收件 Email" });
+        return;
+      }
+      if (!/^\d{8}$/.test(invoiceTaxId.trim())) {
+        setMessage({ type: "error", text: "統編格式需為 8 碼數字" });
+        return;
+      }
+      if (!emailRe.test(invoiceRecipientEmail.trim())) {
+        setMessage({ type: "error", text: "請輸入有效的發票收件 Email" });
+        return;
+      }
+    }
     if (discountCode.trim() && discountInfo && !discountInfo.valid) {
       setMessage({ type: "error", text: "請使用有效的折扣碼" });
       return;
@@ -191,6 +213,10 @@ export function BookingModal({
           discountCode: discountCode.trim() || undefined,
           studio,
           includeInvoice,
+          microphoneCount: Number(microphoneCount),
+          invoiceTitle: includeInvoice ? invoiceTitle.trim() : undefined,
+          invoiceTaxId: includeInvoice ? invoiceTaxId.trim() : undefined,
+          invoiceRecipientEmail: includeInvoice ? invoiceRecipientEmail.trim() : undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -212,6 +238,10 @@ export function BookingModal({
             studio,
             paidHours: data.paidHours,
             includeTax: includeInvoice,
+            microphoneCount: Number(microphoneCount),
+            invoiceTitle: includeInvoice ? invoiceTitle.trim() : undefined,
+            invoiceTaxId: includeInvoice ? invoiceTaxId.trim() : undefined,
+            invoiceRecipientEmail: includeInvoice ? invoiceRecipientEmail.trim() : undefined,
           }),
         });
         const payData = await payRes.json().catch(() => ({}));
@@ -300,6 +330,22 @@ export function BookingModal({
               className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
               placeholder="您的 Email（預約完成後將寄送通知信）"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700">
+              需求麥克風數量（上限為 4）*
+            </label>
+            <select
+              value={microphoneCount}
+              onChange={(e) => setMicrophoneCount(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+            >
+              <option value="">請選擇</option>
+              <option value="1">1 支</option>
+              <option value="2">2 支</option>
+              <option value="3">3 支</option>
+              <option value="4">4 支</option>
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700">訪談來賓（選填）</label>
@@ -410,24 +456,68 @@ export function BookingModal({
               type="checkbox"
               id="includeInvoice"
               checked={includeInvoice}
-              onChange={(e) => setIncludeInvoice(e.target.checked)}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setIncludeInvoice(checked);
+                if (!checked) {
+                  setInvoiceTitle("");
+                  setInvoiceTaxId("");
+                  setInvoiceRecipientEmail("");
+                }
+              }}
               className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
             />
             <label htmlFor="includeInvoice" className="text-sm font-medium text-slate-700">
               需要開立發票（含 5% 稅金）
             </label>
           </div>
-          <p className="text-sm font-bold text-rose-600">
-            如需開立發票，請務必填寫抬頭統編於備註欄。
-          </p>
+          {includeInvoice && (
+            <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 space-y-3">
+              <p className="text-sm font-bold text-rose-700">
+                已勾選開立發票，請填寫抬頭與統編（必填）
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">發票抬頭 *</label>
+                <input
+                  type="text"
+                  value={invoiceTitle}
+                  onChange={(e) => setInvoiceTitle(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  placeholder="請填寫公司抬頭"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">收件 Email *</label>
+                <input
+                  type="email"
+                  value={invoiceRecipientEmail}
+                  onChange={(e) => setInvoiceRecipientEmail(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  placeholder="請填寫發票收件 Email"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">統一編號 *</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={8}
+                  value={invoiceTaxId}
+                  onChange={(e) => setInvoiceTaxId(e.target.value.replace(/\D/g, ""))}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  placeholder="請填寫 8 碼統編"
+                />
+              </div>
+            </div>
+          )}
           <div>
-            <label className="block text-sm font-medium text-slate-700">備註</label>
+            <label className="block text-sm font-medium text-slate-700">備註（選填）</label>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={2}
               className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-              placeholder="設備需求、人數等"
+              placeholder="是否需租借 DJI Pocket3、DJI Pocket4（每次酌收 500 元使用費）"
             />
           </div>
           {message && (
