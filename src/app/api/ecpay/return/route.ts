@@ -9,6 +9,55 @@ import { createCalendarEvent, isSlotAvailable } from "@/lib/google-calendar";
 import { sendBookingConfirmation, sendInvoiceNotificationToAdmin } from "@/lib/email";
 import { STUDIOS, type StudioId } from "@/lib/studios";
 
+function extractBookingFields(note?: string): {
+  microphoneCount?: number;
+  invoiceTitle?: string;
+  invoiceTaxId?: string;
+  invoiceRecipientEmail?: string;
+  plainNote?: string;
+} {
+  if (!note) return { plainNote: "" };
+  const lines = note
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  let microphoneCount: number | undefined;
+  let invoiceTitle: string | undefined;
+  let invoiceTaxId: string | undefined;
+  let invoiceRecipientEmail: string | undefined;
+  const plainLines: string[] = [];
+
+  for (const line of lines) {
+    if (line.startsWith("需求麥克風數量：")) {
+      const match = line.match(/需求麥克風數量：\s*(\d+)/);
+      if (match) microphoneCount = parseInt(match[1], 10);
+      continue;
+    }
+    if (line.startsWith("發票抬頭：")) {
+      invoiceTitle = line.replace("發票抬頭：", "").trim();
+      continue;
+    }
+    if (line.startsWith("統編：")) {
+      invoiceTaxId = line.replace("統編：", "").trim();
+      continue;
+    }
+    if (line.startsWith("發票收件 Email：")) {
+      invoiceRecipientEmail = line.replace("發票收件 Email：", "").trim();
+      continue;
+    }
+    plainLines.push(line);
+  }
+
+  return {
+    microphoneCount,
+    invoiceTitle,
+    invoiceTaxId,
+    invoiceRecipientEmail,
+    plainNote: plainLines.join("\n"),
+  };
+}
+
 /** 綠界付款結果通知（Server POST），需回傳 1|OK */
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
@@ -56,8 +105,25 @@ export async function POST(request: NextRequest) {
     }
 
     const roomLabel = order.studio === "small" ? "小間" : "大間";
-    const summary = `[錄音室預約-付費-${roomLabel}] ${order.name}${order.interviewGuests?.trim() ? ` 訪談：${order.interviewGuests.trim()}` : ""}`;
-    const description = `聯絡方式：${order.contact}${order.note ? `\n備註：${order.note}` : ""}${order.interviewGuests ? `\n訪談來賓：${order.interviewGuests}` : ""}${order.discountCode ? `\n折扣碼：${order.discountCode}\n付費超出：${order.paidHours} 小時` : ""}`;
+    const bookingFields = extractBookingFields(order.note);
+    const micLabel = bookingFields.microphoneCount
+      ? `${bookingFields.microphoneCount} 支`
+      : "未填";
+    const summary = `[錄音室預約-付費-${roomLabel}] ${order.name}${order.interviewGuests?.trim() ? ` 訪談：${order.interviewGuests.trim()}` : ""} ｜麥克風 ${micLabel}`;
+    const detailLines: string[] = [`聯絡方式：${order.contact}`, `麥克風數量：${micLabel}`];
+    if (order.interviewGuests?.trim()) detailLines.push(`訪談來賓：${order.interviewGuests.trim()}`);
+    if (order.discountCode?.trim()) detailLines.push(`折扣碼：${order.discountCode.trim()}`);
+    detailLines.push(`付費超出：${order.paidHours} 小時`);
+    if (order.includeInvoice) {
+      detailLines.push("需開立發票：是");
+      if (bookingFields.invoiceTitle) detailLines.push(`發票抬頭：${bookingFields.invoiceTitle}`);
+      if (bookingFields.invoiceTaxId) detailLines.push(`統編：${bookingFields.invoiceTaxId}`);
+      if (bookingFields.invoiceRecipientEmail) {
+        detailLines.push(`發票收件 Email：${bookingFields.invoiceRecipientEmail}`);
+      }
+    }
+    if (bookingFields.plainNote) detailLines.push(`備註：${bookingFields.plainNote}`);
+    const description = detailLines.join("\n");
 
     // 確保為 ISO 字串（試算表可能回傳不同格式）
     const startIso = new Date(order.start).toISOString();
@@ -122,7 +188,10 @@ export async function POST(request: NextRequest) {
         studio: order.studio as StudioId,
         studioLabel: STUDIOS[order.studio as StudioId],
         amount: order.amount,
-        note: order.note,
+        note: bookingFields.plainNote,
+        invoiceTitle: bookingFields.invoiceTitle,
+        invoiceTaxId: bookingFields.invoiceTaxId,
+        invoiceRecipientEmail: bookingFields.invoiceRecipientEmail,
       });
     }
     console.log("[ECPay Return] 行事曆已建立，訂單已標記完成", { merchantTradeNo });

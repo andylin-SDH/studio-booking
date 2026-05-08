@@ -41,6 +41,12 @@ export interface InvoiceNotificationParams {
   amount?: number;
   /** 使用者備註（選填） */
   note?: string;
+  /** 發票抬頭（選填） */
+  invoiceTitle?: string;
+  /** 統一編號（選填） */
+  invoiceTaxId?: string;
+  /** 發票收件 Email（選填） */
+  invoiceRecipientEmail?: string;
 }
 
 function formatDateTime(iso: string): string {
@@ -152,12 +158,26 @@ export async function sendInvoiceNotificationToAdmin(
     return false;
   }
 
-  const { name, contact, start, end, studioLabel, amount, note } = params;
+  const {
+    name,
+    contact,
+    start,
+    end,
+    studioLabel,
+    amount,
+    note,
+    invoiceTitle,
+    invoiceTaxId,
+    invoiceRecipientEmail,
+  } = params;
   const startStr = formatDateTime(start);
   const endStr = formatDateTime(end);
   const amountStr =
     amount != null && amount > 0 ? `NT$ ${amount.toLocaleString()}` : "";
   const noteStr = note?.trim() || "（未填寫）";
+  const invoiceTitleStr = invoiceTitle?.trim() || "（未填寫）";
+  const invoiceTaxIdStr = invoiceTaxId?.trim() || "（未填寫）";
+  const invoiceRecipientEmailStr = invoiceRecipientEmail?.trim() || "（未填寫）";
 
   const html = `
 <!DOCTYPE html>
@@ -174,6 +194,9 @@ export async function sendInvoiceNotificationToAdmin(
       <p style="margin:0 0 8px"><strong>開始時間</strong>：${startStr}</p>
       <p style="margin:0 0 8px"><strong>結束時間</strong>：${endStr}</p>
       <p style="margin:0 0 8px"><strong>金額</strong>：${amountStr}</p>
+      <p style="margin:0 0 8px"><strong>發票抬頭</strong>：${invoiceTitleStr}</p>
+      <p style="margin:0 0 8px"><strong>統一編號</strong>：${invoiceTaxIdStr}</p>
+      <p style="margin:0 0 8px"><strong>發票收件 Email</strong>：${invoiceRecipientEmailStr}</p>
       <p style="margin:0"><strong>備註</strong>：${noteStr}</p>
     </div>
   </div>

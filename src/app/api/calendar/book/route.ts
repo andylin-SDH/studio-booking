@@ -141,13 +141,21 @@ export async function POST(request: NextRequest) {
     }
 
     const roomLabel = studioId === "big" ? "大間" : "小間";
-    const summary = `[錄音室預約-${roomLabel}] ${name}${interviewGuests?.trim() ? ` 訪談：${interviewGuests.trim()}` : ""}`;
-    const normalizedNote = note?.trim() || "";
-    const invoiceNote =
-      includeInvoice && invoiceTitle?.trim() && invoiceTaxId?.trim() && invoiceRecipientEmail?.trim()
-        ? `${normalizedNote ? `${normalizedNote}\n` : ""}發票抬頭：${invoiceTitle.trim()}\n統編：${invoiceTaxId.trim()}\n發票收件 Email：${invoiceRecipientEmail.trim()}`
-        : normalizedNote;
-    const description = `聯絡方式：${contact}\n需求麥克風數量：${microphoneCount} 支${invoiceNote ? `\n備註：${invoiceNote}` : ""}${interviewGuests?.trim() ? `\n訪談來賓：${interviewGuests.trim()}` : ""}${discountCode?.trim() ? `\n折扣碼：${discountCode.trim()}` : ""}${includeInvoice ? "\n需開立發票：是" : ""}`;
+    const micLabel = `${microphoneCount} 支`;
+    const summary = `[錄音室預約-${roomLabel}] ${name}${interviewGuests?.trim() ? ` 訪談：${interviewGuests.trim()}` : ""} ｜麥克風 ${micLabel}`;
+    const detailLines: string[] = [`聯絡方式：${contact}`, `麥克風數量：${micLabel}`];
+    if (interviewGuests?.trim()) detailLines.push(`訪談來賓：${interviewGuests.trim()}`);
+    if (discountCode?.trim()) detailLines.push(`折扣碼：${discountCode.trim()}`);
+    if (includeInvoice) {
+      detailLines.push("需開立發票：是");
+      if (invoiceTitle?.trim()) detailLines.push(`發票抬頭：${invoiceTitle.trim()}`);
+      if (invoiceTaxId?.trim()) detailLines.push(`統編：${invoiceTaxId.trim()}`);
+      if (invoiceRecipientEmail?.trim()) {
+        detailLines.push(`發票收件 Email：${invoiceRecipientEmail.trim()}`);
+      }
+    }
+    if (note?.trim()) detailLines.push(`備註：${note.trim()}`);
+    const description = detailLines.join("\n");
 
     const eventId = await createCalendarEvent(
       { start, end, summary, description },
