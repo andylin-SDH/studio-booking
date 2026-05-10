@@ -20,6 +20,16 @@ import {
   setMinutes,
 } from "date-fns";
 import { zhTW } from "date-fns/locale";
+import {
+  getSmallStudioWeekendMode,
+  isWeekendForCalendarGridDay,
+  SMALL_STUDIO_WEEKEND_BLOCKED_NOTICE,
+  SMALL_STUDIO_WEEKEND_CONTACT_LINE,
+  EVENING_BOOKING_NOTICE_TITLE,
+  EVENING_BOOKING_NOTICE_BODY,
+  isEveningBookingStartTaipei,
+} from "@/lib/booking-rules";
+import { WeekendProminentAlert } from "@/components/WeekendProminentAlert";
 
 const DAY_START_HOUR = 9;
 const DAY_END_HOUR = 21;
@@ -117,6 +127,9 @@ export function CalendarSection({
   const maxMonth = startOfMonth(maxDate);
   const canGoPrev = currentMonth > minMonth;
   const canGoNext = currentMonth < maxMonth;
+
+  const smallWeekendBlocked =
+    studio === "small" && getSmallStudioWeekendMode() === "blocked";
 
   const eventRanges = useMemo(
     () =>
@@ -251,10 +264,22 @@ export function CalendarSection({
       {/* 月曆格子 + 圖例：小螢幕可橫向捲動 */}
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="min-w-[280px]">
-        <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-center text-xs font-medium text-slate-600 sm:text-sm">
-          {["日", "一", "二", "三", "四", "五", "六"].map((d) => (
-            <div key={d} className="py-2">
+        <div className="grid grid-cols-7 border-b border-slate-200 text-center text-xs font-medium sm:text-sm">
+          {["日", "一", "二", "三", "四", "五", "六"].map((d, i) => (
+            <div
+              key={d}
+              className={`py-2 ${
+                smallWeekendBlocked && (i === 0 || i === 6)
+                  ? "bg-orange-100/95 text-orange-950 font-semibold"
+                  : "bg-slate-50 text-slate-600"
+              }`}
+            >
               {d}
+              {smallWeekendBlocked && (i === 0 || i === 6) && (
+                <span className="mt-0.5 block text-[10px] font-normal leading-none text-amber-900/75">
+                  線上停約
+                </span>
+              )}
             </div>
           ))}
         </div>
@@ -265,7 +290,10 @@ export function CalendarSection({
               const selected = selectedDate && isSameDay(day, selectedDate);
               const isPast = isBefore(startOfDay(day), startOfDay(new Date()));
               const beyondMax = startOfDay(day) > startOfDay(maxDate);
-              const selectable = inMonth && !isPast && !beyondMax;
+              const weekendClosedSmall =
+                smallWeekendBlocked && inMonth && isWeekendForCalendarGridDay(day);
+              const selectable =
+                inMonth && !isPast && !beyondMax && !weekendClosedSmall;
               const bookedMins = inMonth ? (dailyUsage.get(format(day, "yyyy-MM-dd")) ?? 0) : 0;
               const ratio = totalMinutesPerDay > 0 ? bookedMins / totalMinutesPerDay : 0;
               const usageLevel: "empty" | "low" | "medium" | "full" =
@@ -288,15 +316,41 @@ export function CalendarSection({
                   key={day.toISOString()}
                   type="button"
                   disabled={!selectable}
+                  title={
+                    weekendClosedSmall ? SMALL_STUDIO_WEEKEND_BLOCKED_NOTICE : undefined
+                  }
                   onClick={() => handleDateChange(selectable ? day : null)}
-                  className={`min-h-[44px] border-b border-r border-slate-100 p-1.5 text-left text-sm transition sm:min-h-[52px] sm:p-2
+                  className={`${
+                    weekendClosedSmall
+                      ? "min-h-[3.75rem] sm:min-h-[4rem]"
+                      : "min-h-[44px] sm:min-h-[52px]"
+                  } border-b border-r border-slate-100 p-2 text-left text-sm transition sm:p-2.5
                     ${inMonth ? "text-slate-800" : "text-slate-300"}
-                    ${!selectable ? "cursor-not-allowed opacity-50" : "hover:bg-slate-50"}
-                    ${selected ? "bg-sky-100 ring-2 ring-sky-500" : showUsage ? usageBg : ""}
-                    ${isToday(day) ? "font-semibold text-sky-600" : ""}`}
+                    ${
+                      weekendClosedSmall
+                        ? "cursor-not-allowed bg-gradient-to-b from-amber-50/90 via-orange-50/50 to-stone-50/40 text-amber-950 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.12)]"
+                        : !selectable
+                          ? "cursor-not-allowed opacity-50"
+                          : "hover:bg-slate-50"
+                    }
+                    ${selected ? "bg-sky-100 ring-2 ring-sky-500" : showUsage && !weekendClosedSmall ? usageBg : ""}
+                    ${isToday(day) ? (weekendClosedSmall ? "font-semibold text-amber-950 ring-1 ring-amber-400/35 ring-inset" : "font-semibold text-sky-600") : ""}`}
                 >
-                  <span className="block">{format(day, "d")}</span>
-                  {bookedHoursLabel && showUsage && (
+                  <span
+                    className={`block tabular-nums ${
+                      weekendClosedSmall && inMonth
+                        ? "text-[15px] font-semibold tracking-tight text-amber-950"
+                        : ""
+                    }`}
+                  >
+                    {format(day, "d")}
+                  </span>
+                  {weekendClosedSmall && (
+                    <p className="mt-1 border-l-2 border-amber-500/65 pl-2 text-[10px] font-normal leading-snug text-amber-950/85 break-words sm:text-[11px] sm:leading-[1.45]">
+                      {SMALL_STUDIO_WEEKEND_CONTACT_LINE}
+                    </p>
+                  )}
+                  {bookedHoursLabel && showUsage && !weekendClosedSmall && (
                     <span
                       className={`block truncate text-[10px] leading-tight ${
                         usageLevel === "full" ? "text-rose-600" : usageLevel === "medium" ? "text-amber-700" : "text-emerald-600"
@@ -326,6 +380,14 @@ export function CalendarSection({
             <span className="h-3 w-4 rounded border border-rose-200 bg-rose-100" />
             較滿
           </span>
+          {smallWeekendBlocked && (
+            <span className="flex max-w-[220px] flex-col gap-0.5 border-l border-slate-200 pl-3 sm:max-w-none sm:flex-row sm:items-center sm:gap-1.5 sm:pl-4">
+              <span className="flex items-center gap-1.5">
+                <span className="h-3 w-4 shrink-0 rounded border border-orange-300 bg-orange-50" />
+                週六日欄：小間不開放線上
+              </span>
+            </span>
+          )}
         </div>
       </div>
 
@@ -403,6 +465,17 @@ export function CalendarSection({
                   </select>
                 </div>
               </div>
+              {startTime &&
+                (() => {
+                  const [h, m] = startTime.split(":").map(Number);
+                  const d = new Date(selectedDate);
+                  d.setHours(h, m, 0, 0);
+                  return isEveningBookingStartTaipei(d);
+                })() && (
+                  <WeekendProminentAlert title={EVENING_BOOKING_NOTICE_TITLE}>
+                    {EVENING_BOOKING_NOTICE_BODY}
+                  </WeekendProminentAlert>
+                )}
               <p className="text-xs text-slate-500">
                 最少起租 1 小時
               </p>

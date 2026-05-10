@@ -8,6 +8,7 @@ import {
 import { createCalendarEvent, isSlotAvailable } from "@/lib/google-calendar";
 import { sendBookingConfirmation, sendInvoiceNotificationToAdmin } from "@/lib/email";
 import { STUDIOS, type StudioId } from "@/lib/studios";
+import { getSmallStudioWeekendBookingBlockMessage } from "@/lib/booking-rules";
 
 function extractBookingFields(note?: string): {
   microphoneCount?: number;
@@ -129,6 +130,22 @@ export async function POST(request: NextRequest) {
     const startIso = new Date(order.start).toISOString();
     const endIso = new Date(order.end).toISOString();
     console.log("[ECPay Return] 建立行事曆", { start: startIso, end: endIso, studio: order.studio });
+
+    const weekendBlock = getSmallStudioWeekendBookingBlockMessage(
+      order.studio as StudioId,
+      order.start
+    );
+    if (weekendBlock) {
+      console.error("[ECPay Return] 小間週末預約不符政策，不建立行事曆（需人工處理已付款訂單）", {
+        merchantTradeNo,
+        weekendBlock,
+        start: startIso,
+        studio: order.studio,
+      });
+      return new NextResponse("1|OK", {
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
+    }
 
     const stillAvailable = await isSlotAvailable(startIso, endIso, order.studio as StudioId);
     if (!stillAvailable) {

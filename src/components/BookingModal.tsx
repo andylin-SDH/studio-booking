@@ -4,6 +4,16 @@ import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { STUDIOS } from "@/lib/studios";
 import { zhTW } from "date-fns/locale";
+import {
+  BIG_STUDIO_WEEKEND_NOTICE,
+  SMALL_STUDIO_WEEKEND_NOTICE_ONLY,
+  EVENING_BOOKING_NOTICE_TITLE,
+  EVENING_BOOKING_NOTICE_BODY,
+  getSmallStudioWeekendMode,
+  isWeekendTaipei,
+  isEveningBookingStartTaipei,
+} from "@/lib/booking-rules";
+import { WeekendProminentAlert } from "@/components/WeekendProminentAlert";
 
 /** 將 Date 轉為 Asia/Taipei ISO 字串，避免時區解析錯誤 */
 function toTaiwanISOString(date: Date): string {
@@ -71,6 +81,12 @@ export function BookingModal({
   const [cancelingEventId, setCancelingEventId] = useState<string | null>(null);
 
   const durationHours = durationMinutes / 60;
+
+  const isWeekendSlot = isWeekendTaipei(start);
+  const showBigWeekendNotice = studio === "big" && isWeekendSlot;
+  const showSmallWeekendNoticeOnly =
+    studio === "small" && isWeekendSlot && getSmallStudioWeekendMode() === "notice_only";
+  const showEveningNotice = isEveningBookingStartTaipei(start);
 
   // 折扣碼查詢完成後，預設選擇「本次預約所在月份」作為已預約列表的分頁
   useEffect(() => {
@@ -311,6 +327,18 @@ export function BookingModal({
           </p>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {(showBigWeekendNotice || showSmallWeekendNoticeOnly) && (
+            <WeekendProminentAlert title="週末預約 · 請先看這裡">
+              {showBigWeekendNotice
+                ? BIG_STUDIO_WEEKEND_NOTICE
+                : SMALL_STUDIO_WEEKEND_NOTICE_ONLY}
+            </WeekendProminentAlert>
+          )}
+          {showEveningNotice && (
+            <WeekendProminentAlert title={EVENING_BOOKING_NOTICE_TITLE}>
+              {EVENING_BOOKING_NOTICE_BODY}
+            </WeekendProminentAlert>
+          )}
           <div>
             <label className="block text-sm font-medium text-slate-700">姓名 *</label>
             <input
