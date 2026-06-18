@@ -8,7 +8,7 @@ import {
 } from "@/lib/google-sheet";
 import { sendBookingConfirmation } from "@/lib/email";
 import { STUDIOS } from "@/lib/studios";
-import { getSmallStudioWeekendBookingBlockMessage } from "@/lib/booking-rules";
+import { getSmallStudioOnlineBookingBlockMessage } from "@/lib/booking-rules";
 
 export async function POST(request: NextRequest) {
   let body: {
@@ -74,9 +74,9 @@ export async function POST(request: NextRequest) {
   if (isNaN(startMs) || isNaN(endMs) || endMs <= startMs) {
     return NextResponse.json({ error: "無效的 start/end 時間" }, { status: 400 });
   }
-  const weekendBlock = getSmallStudioWeekendBookingBlockMessage(studioId, start);
-  if (weekendBlock) {
-    return NextResponse.json({ error: weekendBlock }, { status: 400 });
+  const onlineBlock = getSmallStudioOnlineBookingBlockMessage(studioId, start);
+  if (onlineBlock) {
+    return NextResponse.json({ error: onlineBlock }, { status: 400 });
   }
   const durationMinutes = Math.round((endMs - startMs) / 60000);
   const durationHours = durationMinutes / 60;

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildEcpayForm } from "@/lib/ecpay";
 import { addPendingOrder } from "@/lib/google-sheet";
-import { getSmallStudioWeekendBookingBlockMessage } from "@/lib/booking-rules";
+import { getSmallStudioOnlineBookingBlockMessage } from "@/lib/booking-rules";
 
 /** 超出時數：每小時 500、每半小時 250（TWD） */
 const HOURLY_RATE =
@@ -84,9 +84,9 @@ export async function POST(request: NextRequest) {
   );
 
   const studioId = (studio === "small" ? "small" : "big") as "big" | "small";
-  const weekendBlock = getSmallStudioWeekendBookingBlockMessage(studioId, start);
-  if (weekendBlock) {
-    return NextResponse.json({ error: weekendBlock }, { status: 400 });
+  const onlineBlock = getSmallStudioOnlineBookingBlockMessage(studioId, start);
+  if (onlineBlock) {
+    return NextResponse.json({ error: onlineBlock }, { status: 400 });
   }
   const addTax = body.includeTax !== undefined ? body.includeTax : DEFAULT_INCLUDE_TAX;
   let amount = Math.ceil(paidHours * HOURLY_RATE);

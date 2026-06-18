@@ -86,7 +86,8 @@ export function BookingModal({
   const showBigWeekendNotice = studio === "big" && isWeekendSlot;
   const showSmallWeekendNoticeOnly =
     studio === "small" && isWeekendSlot && getSmallStudioWeekendMode() === "notice_only";
-  const showEveningNotice = isEveningBookingStartTaipei(start);
+  const showEveningNotice =
+    studio === "big" && isEveningBookingStartTaipei(start);
 
   // 折扣碼查詢完成後，預設選擇「本次預約所在月份」作為已預約列表的分頁
   useEffect(() => {

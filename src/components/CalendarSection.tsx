@@ -25,6 +25,7 @@ import {
   isWeekendForCalendarGridDay,
   SMALL_STUDIO_WEEKEND_BLOCKED_NOTICE,
   SMALL_STUDIO_WEEKEND_CONTACT_LINE,
+  SMALL_STUDIO_EVENING_BLOCKED_NOTICE,
   EVENING_BOOKING_NOTICE_TITLE,
   EVENING_BOOKING_NOTICE_BODY,
   isEveningBookingStartTaipei,
@@ -417,8 +418,18 @@ export function CalendarSection({
                       const slotEnd = new Date(slotStart.getTime() + 30 * 60 * 1000);
                       const past = slotStart <= new Date();
                       const busy = isSlotBusy(slotStart, slotEnd);
-                      const disabled = past || busy;
-                      const label = past ? (busy ? "（已過／已預約）" : "（已過）") : (busy ? "（已預約）" : "");
+                      const eveningBlockedSmall =
+                        studio === "small" && isEveningBookingStartTaipei(slotStart);
+                      const disabled = past || busy || eveningBlockedSmall;
+                      const label = eveningBlockedSmall
+                        ? "（線上不開放）"
+                        : past
+                          ? busy
+                            ? "（已過／已預約）"
+                            : "（已過）"
+                          : busy
+                            ? "（已預約）"
+                            : "";
                       return (
                         <option key={t} value={t} disabled={disabled}>
                           {t} {label}
@@ -465,7 +476,15 @@ export function CalendarSection({
                   </select>
                 </div>
               </div>
-              {startTime &&
+              {studio === "small" &&
+                selectedDate &&
+                !isWeekendForCalendarGridDay(selectedDate) && (
+                  <p className="border-l-2 border-amber-500/65 pl-2.5 text-xs leading-relaxed text-amber-950/85">
+                    {SMALL_STUDIO_EVENING_BLOCKED_NOTICE}
+                  </p>
+                )}
+              {studio === "big" &&
+                startTime &&
                 (() => {
                   const [h, m] = startTime.split(":").map(Number);
                   const d = new Date(selectedDate);

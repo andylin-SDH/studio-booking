@@ -14,10 +14,14 @@ export const SMALL_STUDIO_WEEKEND_BLOCKED_NOTICE =
 /** 小間改為「僅警示、可線上預約」時，在 Modal 顯示（與舊「阻擋」二擇一設定） */
 export const SMALL_STUDIO_WEEKEND_NOTICE_ONLY = SMALL_STUDIO_WEEKEND_CONTACT_LINE;
 
-/** 大／小間：開始時段落在 19:00（含）以後時顯示（僅提醒，不阻擋預約） */
+/** 大間：開始時段落在 19:00（含）以後時顯示（僅提醒，不阻擋預約） */
 export const EVENING_BOOKING_NOTICE_TITLE = "晚上時段預約 · 請先看這裡";
 export const EVENING_BOOKING_NOTICE_BODY =
   "因晚上時段無工作人員固定上班，預約前請聯繫經紀人確認，或取得自助入場方式";
+
+/** 小間：19:00（含）以後不開放線上預約（平日與週末皆適用；週末整日已另阻擋） */
+export const SMALL_STUDIO_EVENING_BLOCKED_NOTICE =
+  `小間 19:00 以後不開放線上預約；${SMALL_STUDIO_WEEKEND_CONTACT_LINE}`;
 
 /**
  * 小間週末線上預約政策（大間不受此設定影響）。
@@ -83,7 +87,7 @@ export function isEveningBookingStartTaipei(date: Date): boolean {
 }
 
 /**
- * 若應阻擋週末線上預約，回傳錯誤訊息；否則 null。
+ * 若應阻擋小間週末線上預約，回傳錯誤訊息；否則 null。
  */
 export function getSmallStudioWeekendBookingBlockMessage(
   studio: StudioId,
@@ -93,4 +97,26 @@ export function getSmallStudioWeekendBookingBlockMessage(
   if (getSmallStudioWeekendMode() !== "blocked") return null;
   if (!isBookingStartWeekendTaipei(isoStart)) return null;
   return SMALL_STUDIO_WEEKEND_BLOCKED_NOTICE;
+}
+
+/** 小間是否因晚上時段（開始 ≥ 19:00）而阻擋線上預約 */
+export function isSmallStudioEveningBlocked(studio: StudioId, isoStart: string): boolean {
+  if (studio !== "small") return false;
+  return isEveningBookingStartTaipei(new Date(isoStart));
+}
+
+/**
+ * 小間線上預約阻擋（週末整日、19:00 起晚上時段）；大間不受影響。
+ */
+export function getSmallStudioOnlineBookingBlockMessage(
+  studio: StudioId,
+  isoStart: string
+): string | null {
+  if (studio !== "small") return null;
+  const weekendBlock = getSmallStudioWeekendBookingBlockMessage(studio, isoStart);
+  if (weekendBlock) return weekendBlock;
+  if (isSmallStudioEveningBlocked(studio, isoStart)) {
+    return SMALL_STUDIO_EVENING_BLOCKED_NOTICE;
+  }
+  return null;
 }
