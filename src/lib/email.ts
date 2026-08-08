@@ -149,6 +149,82 @@ export async function sendBookingConfirmation(params: BookingEmailParams): Promi
   }
 }
 
+/** 行事曆時段衝突的單筆資料 */
+export interface ConflictPair {
+  studioLabel: string;
+  aSummary: string;
+  aStart: string;
+  aEnd: string;
+  bSummary: string;
+  bStart: string;
+  bEnd: string;
+}
+
+/**
+ * 行事曆時段衝突提醒（寄給管理端）
+ * 收件人取自 CONFLICT_ALERT_EMAIL，未設定時回傳 false 不寄信
+ */
+export async function sendConflictAlert(conflicts: ConflictPair[]): Promise<boolean> {
+  const client = getResendClient();
+  if (!client) {
+    console.warn("[Email] 未設定 RESEND_API_KEY，跳過衝突提醒信");
+    return false;
+  }
+  const recipients = (process.env.CONFLICT_ALERT_EMAIL || "")
+    .split(",")
+    .map((email) => email.trim())
+    .filter(Boolean);
+  if (recipients.length === 0) {
+    console.warn("[Email] 未設定 CONFLICT_ALERT_EMAIL，跳過衝突提醒信");
+    return false;
+  }
+  if (conflicts.length === 0) return false;
+
+  const rows = conflicts
+    .map(
+      (c) => `
+    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin:0 0 12px">
+      <p style="margin:0 0 8px;font-weight:600;color:#b91c1c">${c.studioLabel} · 時段重疊</p>
+      <p style="margin:0 0 4px;color:#334155"><strong>A</strong>：${c.aSummary}</p>
+      <p style="margin:0 0 8px;font-size:0.8125rem;color:#64748b">${formatDateTime(c.aStart)} — ${formatDateTime(c.aEnd)}</p>
+      <p style="margin:0 0 4px;color:#334155"><strong>B</strong>：${c.bSummary}</p>
+      <p style="margin:0;font-size:0.8125rem;color:#64748b">${formatDateTime(c.bStart)} — ${formatDateTime(c.bEnd)}</p>
+    </div>`
+    )
+    .join("");
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;font-family:system-ui,sans-serif;color:#0f172a;background:#f8fafc;padding:24px">
+  <div style="max-width:560px;margin:0 auto;background:white;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
+    <h2 style="margin:0 0 16px;font-size:1.25rem">【盛德好】行事曆預約衝突提醒</h2>
+    <p style="margin:0 0 16px;color:#64748b">系統偵測到以下 ${conflicts.length} 組時段重疊，可能為人工與系統預約協作不一致，請人工確認。</p>
+    ${rows}
+    <p style="margin:16px 0 0;font-size:0.75rem;color:#94a3b8">此為自動偵測，僅供提醒，未修改任何行事曆或系統資料。</p>
+  </div>
+</body>
+</html>`;
+
+  try {
+    const { error } = await client.emails.send({
+      from: FROM_EMAIL,
+      to: recipients,
+      subject: `【盛德好】行事曆預約衝突提醒（${conflicts.length} 組）`,
+      html,
+    });
+    if (error) {
+      console.error("[Email] 衝突提醒信寄送失敗", error);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("[Email] 衝突提醒信寄送失敗", e);
+    return false;
+  }
+}
+
 export async function sendInvoiceNotificationToAdmin(
   params: InvoiceNotificationParams
 ): Promise<boolean> {

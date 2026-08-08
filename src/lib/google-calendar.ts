@@ -123,6 +123,56 @@ export async function getCalendarEvents(
   return events;
 }
 
+export interface CalendarEventDetail {
+  id: string;
+  summary: string;
+  start: string;
+  end: string;
+  isAllDay: boolean;
+}
+
+/**
+ * 取得指定日期範圍內的行事曆事件詳情（含 id、summary），供衝突檢查與通知使用
+ * 為唯讀操作，不會修改任何行事曆內容
+ */
+export async function getCalendarEventsDetailed(
+  from: string,
+  to: string,
+  studio: StudioId = "big"
+): Promise<CalendarEventDetail[]> {
+  const { calendar, calendarId } = getCalendarClient(studio);
+  const timeMin = new Date(from + "T00:00:00+08:00").toISOString();
+  const timeMax = new Date(to + "T23:59:59.999+08:00").toISOString();
+
+  const res = await calendar.events.list({
+    calendarId,
+    timeMin,
+    timeMax,
+    singleEvents: true,
+    orderBy: "startTime",
+  });
+
+  const events: CalendarEventDetail[] = [];
+  for (const ev of res.data.items || []) {
+    const start = ev.start?.dateTime ?? ev.start?.date;
+    const end = ev.end?.dateTime ?? ev.end?.date;
+    if (!start || !end) continue;
+
+    const isAllDay = typeof ev.start?.date === "string";
+    const startStr = ev.start?.date ? `${start}T00:00:00+08:00` : start;
+    const endStr = ev.end?.date ? `${end}T00:00:00+08:00` : end;
+
+    events.push({
+      id: ev.id || "",
+      summary: (ev.summary || "（無標題）").trim(),
+      start: startStr,
+      end: endStr,
+      isAllDay,
+    });
+  }
+  return events;
+}
+
 /**
  * 檢查指定時段是否仍未被預約（與既有事件無重疊）
  * 用於多人同時看同一時段時，僅允許先送出的那筆成立，後送出的會收到衝突錯誤

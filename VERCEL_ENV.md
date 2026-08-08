@@ -79,6 +79,20 @@ Vercel Cron 會每天凌晨 5 點呼叫 `/api/cron/sync-deleted-usage`。使用�
 
 ---
 
+## 行事曆衝突檢查（選填）
+
+唯讀比對「大間」「小間」兩個行事曆未來 90 天內是否有時段重疊（例如人工與系統各自加入造成重複預約）。**此功能不修改行事曆、不動試算表**，僅在發現衝突時寄信提醒。
+
+| 變數名稱 | 說明 |
+|---------|------|
+| `CONFLICT_ALERT_EMAIL` | 衝突提醒信的收件人。未設定則不寄信。 |
+| `CRON_SECRET` | 同上排程驗證密鑰（與行事曆刪除同步共用）。 |
+| `RESEND_API_KEY` | 寄信用，未設定則不寄信。 |
+
+Vercel Cron 會每天凌晨 1 點（UTC，約台灣早上 9 點）呼叫 `/api/cron/check-conflicts`。無衝突時不寄信。手動測試可加 `?always=1` 於回應中看到衝突明細。
+
+---
+
 ## 完整清單（複製用）
 
 ```
@@ -95,6 +109,7 @@ NEXT_PUBLIC_APP_URL=https://你的專案.vercel.app
 RESEND_API_KEY=
 EMAIL_FROM=盛德好錄音室 <andylin@sdh-corp.com>
 CRON_SECRET=
+CONFLICT_ALERT_EMAIL=
 ```
 
 填入實際值後貼到 Vercel 環境變數即可。
