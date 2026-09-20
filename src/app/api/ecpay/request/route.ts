@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { buildEcpayForm } from "@/lib/ecpay";
 import { addPendingOrder } from "@/lib/google-sheet";
 import { getSmallStudioOnlineBookingBlockMessage } from "@/lib/booking-rules";
+import { isSlotAvailable } from "@/lib/google-calendar";
 
 /** 超出時數：每小時 500、每半小時 250（TWD） */
 const HOURLY_RATE =
@@ -88,6 +89,21 @@ export async function POST(request: NextRequest) {
   if (onlineBlock) {
     return NextResponse.json({ error: onlineBlock }, { status: 400 });
   }
+
+  // 付款前先擋時段，避免前端殘留可約、付完才發現衝突
+  try {
+    const stillAvailable = await isSlotAvailable(start, end, studioId);
+    if (!stillAvailable) {
+      return NextResponse.json(
+        { error: "該時段已被預約，請重新選擇時段或重新整理頁面查看最新狀況。" },
+        { status: 409 }
+      );
+    }
+  } catch (e) {
+    console.error("ECPay request slot check error:", e);
+    return NextResponse.json({ error: "無法確認時段是否可約，請稍後再試" }, { status: 500 });
+  }
+
   const addTax = body.includeTax !== undefined ? body.includeTax : DEFAULT_INCLUDE_TAX;
   let amount = Math.ceil(paidHours * HOURLY_RATE);
   if (addTax) {

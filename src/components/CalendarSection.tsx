@@ -16,8 +16,6 @@ import {
   isToday,
   isBefore,
   parseISO,
-  setHours,
-  setMinutes,
 } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import {
@@ -29,6 +27,8 @@ import {
   EVENING_BOOKING_NOTICE_TITLE,
   EVENING_BOOKING_NOTICE_BODY,
   isEveningBookingStartTaipei,
+  taipeiDateTimeFromGridDay,
+  rangesOverlap,
 } from "@/lib/booking-rules";
 import { WeekendProminentAlert } from "@/components/WeekendProminentAlert";
 
@@ -38,6 +38,17 @@ const DAY_END_HOUR = 21;
 const MIN_DURATION_MINUTES = 60;
 /** 最多可預約到今天起的 N 天內 */
 const MAX_BOOKING_DAYS_AHEAD = 90;
+/** 開啟頁面時定期重抓行事曆，避免別人剛約完仍顯示可約 */
+const EVENTS_REFRESH_MS = 30_000;
+
+function formatTaipeiHm(date: Date): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Taipei",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
 
 type CalendarEvent = { start: string; end: string };
 
@@ -67,6 +78,19 @@ export function CalendarSection({
     const onBookingSuccess = () => setRefreshTrigger((n) => n + 1);
     window.addEventListener("booking-success", onBookingSuccess);
     return () => window.removeEventListener("booking-success", onBookingSuccess);
+  }, []);
+
+  // 頁面停留時定期刷新（手機長開頁最容易看到「明明已約卻還可選」）
+  useEffect(() => {
+    const id = window.setInterval(() => setRefreshTrigger((n) => n + 1), EVENTS_REFRESH_MS);
+    const onVis = () => {
+      if (document.visibilityState === "visible") setRefreshTrigger((n) => n + 1);
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, []);
 
   const monthStart = startOfMonth(currentMonth);
@@ -144,11 +168,11 @@ export function CalendarSection({
   /** 當日可預約總分鐘數（9:00–21:00） */
   const totalMinutesPerDay = (DAY_END_HOUR - DAY_START_HOUR) * 60;
 
-  /** 計算某天在營業時段內已被預約的分鐘數 */
+  /** 計算某天在營業時段內已被預約的分鐘數（以台北牆鐘對齊） */
   const getBookedMinutesOnDay = useCallback(
     (day: Date) => {
-      const dayStart = setMinutes(setHours(startOfDay(day), DAY_START_HOUR), 0);
-      const dayEnd = setMinutes(setHours(startOfDay(day), DAY_END_HOUR), 0);
+      const dayStart = taipeiDateTimeFromGridDay(day, DAY_START_HOUR, 0);
+      const dayEnd = taipeiDateTimeFromGridDay(day, DAY_END_HOUR, 0);
       let total = 0;
       for (const range of eventRanges) {
         const start = range.start > dayStart ? range.start : dayStart;
@@ -169,12 +193,28 @@ export function CalendarSection({
     return map;
   }, [weeks, getBookedMinutesOnDay]);
 
-  /** 檢查時段是否與任何已預約事件重疊 */
+  /** 檢查時段是否與任何已預約事件重疊（台北牆鐘） */
   const isSlotBusy = (slotStart: Date, slotEnd: Date) =>
-    eventRanges.some(
-      (range) =>
-        slotStart < range.end && slotEnd > range.start
-    );
+    eventRanges.some((range) => rangesOverlap(slotStart, slotEnd, range.start, range.end));
+
+  /** 當日已預約區間（給使用者看，避免手機 select 看不出 disabled） */
+  const bookedRangesOnSelectedDay = useMemo(() => {
+    if (!selectedDate) return [] as { start: Date; end: Date; label: string }[];
+    const dayStart = taipeiDateTimeFromGridDay(selectedDate, DAY_START_HOUR, 0);
+    const dayEnd = taipeiDateTimeFromGridDay(selectedDate, DAY_END_HOUR, 0);
+    return eventRanges
+      .filter((r) => rangesOverlap(r.start, r.end, dayStart, dayEnd))
+      .map((r) => {
+        const start = r.start < dayStart ? dayStart : r.start;
+        const end = r.end > dayEnd ? dayEnd : r.end;
+        return {
+          start,
+          end,
+          label: `${formatTaipeiHm(start)}–${formatTaipeiHm(end)}`,
+        };
+      })
+      .sort((a, b) => a.start.getTime() - b.start.getTime());
+  }, [selectedDate, eventRanges]);
 
   const timeOptions = useMemo(() => {
     const opts: string[] = [];
@@ -187,6 +227,23 @@ export function CalendarSection({
 
   const [startTime, setStartTime] = useState<string>("");
   const [endTime, setEndTime] = useState<string>("");
+
+  // 刷新後若已選時段變成忙碌，清掉避免手機殘留舊值
+  useEffect(() => {
+    if (!selectedDate || !startTime) return;
+    const [sh, sm] = startTime.split(":").map(Number);
+    const start = taipeiDateTimeFromGridDay(selectedDate, sh, sm);
+    const probeEnd = new Date(start.getTime() + 30 * 60 * 1000);
+    if (isSlotBusy(start, probeEnd)) {
+      setStartTime("");
+      setEndTime("");
+      return;
+    }
+    if (!endTime) return;
+    const [eh, em] = endTime.split(":").map(Number);
+    const end = taipeiDateTimeFromGridDay(selectedDate, eh, em);
+    if (isSlotBusy(start, end)) setEndTime("");
+  }, [selectedDate, startTime, endTime, eventRanges]);
 
   const handleStartChange = (val: string) => {
     setStartTime(val);
@@ -402,6 +459,14 @@ export function CalendarSection({
             <p className="text-slate-500">載入中…</p>
           ) : (
             <div className="space-y-4">
+              {bookedRangesOnSelectedDay.length > 0 && (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-900">
+                  <p className="font-semibold">本日已預約（不可再約）</p>
+                  <p className="mt-1 text-rose-800/90">
+                    {bookedRangesOnSelectedDay.map((r) => r.label).join("、")}
+                  </p>
+                </div>
+              )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-slate-700">開始</label>
@@ -411,30 +476,22 @@ export function CalendarSection({
                     className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                   >
                     <option value="">開始時間</option>
-                    {timeOptions.map((t) => {
+                    {timeOptions.flatMap((t) => {
                       const [h, m] = t.split(":").map(Number);
-                      const slotStart = new Date(selectedDate);
-                      slotStart.setHours(h, m, 0, 0);
+                      const slotStart = taipeiDateTimeFromGridDay(selectedDate, h, m);
                       const slotEnd = new Date(slotStart.getTime() + 30 * 60 * 1000);
                       const past = slotStart <= new Date();
                       const busy = isSlotBusy(slotStart, slotEnd);
                       const eveningBlockedSmall =
                         studio === "small" && isEveningBookingStartTaipei(slotStart);
-                      const disabled = past || busy || eveningBlockedSmall;
-                      const label = eveningBlockedSmall
-                        ? "（線上不開放）"
-                        : past
-                          ? busy
-                            ? "（已過／已預約）"
-                            : "（已過）"
-                          : busy
-                            ? "（已預約）"
-                            : "";
-                      return (
-                        <option key={t} value={t} disabled={disabled}>
-                          {t} {label}
-                        </option>
-                      );
+                      // 手機 Safari 常忽略 option disabled：已預約／不開放直接不列入可選
+                      if (busy || eveningBlockedSmall) return [];
+                      return [
+                        <option key={t} value={t} disabled={past}>
+                          {t}
+                          {past ? "（已過）" : ""}
+                        </option>,
+                      ];
                     })}
                   </select>
                 </div>
@@ -452,24 +509,21 @@ export function CalendarSection({
                         if (!startTime || t <= startTime) return false;
                         const [sh, sm] = startTime.split(":").map(Number);
                         const [h, m] = t.split(":").map(Number);
-                        const durationMin =
-                          (h * 60 + m) - (sh * 60 + sm);
-                        return durationMin >= MIN_DURATION_MINUTES;
+                        const durationMin = h * 60 + m - (sh * 60 + sm);
+                        if (durationMin < MIN_DURATION_MINUTES) return false;
+                        const slotStart = taipeiDateTimeFromGridDay(selectedDate, sh, sm);
+                        const slotEnd = taipeiDateTimeFromGridDay(selectedDate, h, m);
+                        // 與已預約重疊的結束時間不列（手機不可靠 disabled）
+                        return !isSlotBusy(slotStart, slotEnd);
                       })
                       .map((t) => {
                         const [h, m] = t.split(":").map(Number);
-                        const [sh, sm] = startTime.split(":").map(Number);
-                        const slotStart = new Date(selectedDate);
-                        slotStart.setHours(sh, sm, 0, 0);
-                        const slotEnd = new Date(selectedDate);
-                        slotEnd.setHours(h, m, 0, 0);
+                        const slotEnd = taipeiDateTimeFromGridDay(selectedDate, h, m);
                         const past = slotEnd <= new Date();
-                        const busy = isSlotBusy(slotStart, slotEnd);
-                        const disabled = past || busy;
-                        const label = past ? (busy ? "（已過／與已預約重疊）" : "（已過）") : (busy ? "（與已預約重疊）" : "");
                         return (
-                          <option key={t} value={t} disabled={disabled}>
-                            {t} {label}
+                          <option key={t} value={t} disabled={past}>
+                            {t}
+                            {past ? "（已過）" : ""}
                           </option>
                         );
                       })}
@@ -487,8 +541,7 @@ export function CalendarSection({
                 startTime &&
                 (() => {
                   const [h, m] = startTime.split(":").map(Number);
-                  const d = new Date(selectedDate);
-                  d.setHours(h, m, 0, 0);
+                  const d = taipeiDateTimeFromGridDay(selectedDate, h, m);
                   return isEveningBookingStartTaipei(d);
                 })() && (
                   <WeekendProminentAlert title={EVENING_BOOKING_NOTICE_TITLE}>
@@ -496,30 +549,30 @@ export function CalendarSection({
                   </WeekendProminentAlert>
                 )}
               <p className="text-xs text-slate-500">
-                最少起租 1 小時
+                最少起租 1 小時；已預約時段不會出現在上方選單。
               </p>
               <button
                 type="button"
-                disabled={!startTime || !endTime || (() => {
-                  if (!startTime || !endTime) return true;
-                  const [sh, sm] = startTime.split(":").map(Number);
-                  const [eh, em] = endTime.split(":").map(Number);
-                  const durationMin = (eh * 60 + em) - (sh * 60 + sm);
-                  if (durationMin < MIN_DURATION_MINUTES) return true;
-                  const slotStart = new Date(selectedDate);
-                  slotStart.setHours(sh, sm, 0, 0);
-                  const slotEnd = new Date(selectedDate);
-                  slotEnd.setHours(eh, em, 0, 0);
-                  return isSlotBusy(slotStart, slotEnd);
-                })()}
+                disabled={
+                  !startTime ||
+                  !endTime ||
+                  (() => {
+                    if (!startTime || !endTime) return true;
+                    const [sh, sm] = startTime.split(":").map(Number);
+                    const [eh, em] = endTime.split(":").map(Number);
+                    const durationMin = eh * 60 + em - (sh * 60 + sm);
+                    if (durationMin < MIN_DURATION_MINUTES) return true;
+                    const slotStart = taipeiDateTimeFromGridDay(selectedDate, sh, sm);
+                    const slotEnd = taipeiDateTimeFromGridDay(selectedDate, eh, em);
+                    return isSlotBusy(slotStart, slotEnd);
+                  })()
+                }
                 onClick={() => {
                   if (!startTime || !endTime) return;
                   const [sh, sm] = startTime.split(":").map(Number);
                   const [eh, em] = endTime.split(":").map(Number);
-                  const start = new Date(selectedDate);
-                  start.setHours(sh, sm, 0, 0);
-                  const end = new Date(selectedDate);
-                  end.setHours(eh, em, 0, 0);
+                  const start = taipeiDateTimeFromGridDay(selectedDate, sh, sm);
+                  const end = taipeiDateTimeFromGridDay(selectedDate, eh, em);
                   if (!isSlotBusy(start, end)) onSelectSlot(start, end);
                 }}
                 className="w-full rounded-lg bg-sky-600 px-4 py-2.5 font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"

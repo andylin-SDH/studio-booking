@@ -102,6 +102,7 @@ export async function getCalendarEvents(
     timeMax,
     singleEvents: true,
     orderBy: "startTime",
+    maxResults: 2500,
   });
 
   const events: { start: string; end: string }[] = [];
@@ -150,6 +151,7 @@ export async function getCalendarEventsDetailed(
     timeMax,
     singleEvents: true,
     orderBy: "startTime",
+    maxResults: 2500,
   });
 
   const events: CalendarEventDetail[] = [];

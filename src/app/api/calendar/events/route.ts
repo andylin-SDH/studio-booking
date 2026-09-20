@@ -19,7 +19,14 @@ export async function GET(request: NextRequest) {
   }
   try {
     const events = await getCalendarEvents(from, to, studio);
-    return NextResponse.json({ events });
+    return NextResponse.json(
+      { events },
+      {
+        headers: {
+          "Cache-Control": "no-store, max-age=0",
+        },
+      }
+    );
   } catch (e) {
     console.error("Calendar events error:", e);
     const message = e instanceof Error ? e.message : "無法取得行事曆";

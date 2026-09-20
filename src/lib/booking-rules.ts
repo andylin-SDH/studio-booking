@@ -120,3 +120,79 @@ export function getSmallStudioOnlineBookingBlockMessage(
   }
   return null;
 }
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/** 任意瞬間 → 台北牆鐘年月日 */
+export function getTaipeiYmd(date: Date = new Date()): { y: number; m: number; d: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  let y = 0;
+  let m = 0;
+  let d = 0;
+  for (const p of parts) {
+    if (p.type === "year") y = parseInt(p.value, 10);
+    if (p.type === "month") m = parseInt(p.value, 10);
+    if (p.type === "day") d = parseInt(p.value, 10);
+  }
+  return { y, m, d };
+}
+
+/**
+ * 以「日曆格上的年月日數字」+ 時分，建立 Asia/Taipei 絕對時間。
+ * 不可用 Date#setHours（會跟手機時區走，已預約時段會誤顯示成可約）。
+ */
+export function taipeiDateTimeFromGridDay(
+  gridDay: Date,
+  hour: number,
+  minute = 0
+): Date {
+  const y = gridDay.getFullYear();
+  const m = gridDay.getMonth() + 1;
+  const d = gridDay.getDate();
+  return new Date(
+    `${y}-${pad2(m)}-${pad2(d)}T${pad2(hour)}:${pad2(minute)}:00+08:00`
+  );
+}
+
+/** Date → 台北牆鐘 ISO（給 API／行事曆） */
+export function toTaiwanISOString(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  let y = "0";
+  let m = "0";
+  let d = "0";
+  let h = "0";
+  let min = "0";
+  for (const p of parts) {
+    if (p.type === "year") y = p.value;
+    if (p.type === "month") m = p.value;
+    if (p.type === "day") d = p.value;
+    if (p.type === "hour") h = p.value === "24" ? "00" : p.value;
+    if (p.type === "minute") min = p.value;
+  }
+  return `${y}-${m}-${d}T${h}:${min}:00+08:00`;
+}
+
+/** 兩時段是否重疊（半開或閉區間皆以「有交集」為準） */
+export function rangesOverlap(
+  aStart: Date,
+  aEnd: Date,
+  bStart: Date,
+  bEnd: Date
+): boolean {
+  return aStart < bEnd && aEnd > bStart;
+}
