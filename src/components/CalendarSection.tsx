@@ -33,7 +33,7 @@ import {
 import { WeekendProminentAlert } from "@/components/WeekendProminentAlert";
 
 const DAY_START_HOUR = 9;
-const DAY_END_HOUR = 21;
+const DAY_END_HOUR = 23;
 /** 最少起租時長（分鐘） */
 const MIN_DURATION_MINUTES = 60;
 /** 最多可預約到今天起的 N 天內 */
@@ -165,7 +165,7 @@ export function CalendarSection({
     [events]
   );
 
-  /** 當日可預約總分鐘數（9:00–21:00） */
+  /** 當日可預約總分鐘數（9:00–23:00） */
   const totalMinutesPerDay = (DAY_END_HOUR - DAY_START_HOUR) * 60;
 
   /** 計算某天在營業時段內已被預約的分鐘數（以台北牆鐘對齊） */

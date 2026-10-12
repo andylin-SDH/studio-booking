@@ -90,7 +90,7 @@ npm run dev
 
 - **空間圖片**：編輯 `src/app/page.tsx` 中的 `SPACE_IMAGES` 陣列，改為您的圖片 URL。  
 - **場地介紹 / 使用需知**：同上檔案，直接改對應區塊的文字。  
-- **營業時段**：在 `src/components/CalendarSection.tsx` 中修改 `DAY_START_HOUR`、`DAY_END_HOUR`（目前為 9–21）。  
+- **營業時段**：在 `src/components/CalendarSection.tsx` 中修改 `DAY_START_HOUR`、`DAY_END_HOUR`（目前為 9–23）。  
 
 ## 授權
 
