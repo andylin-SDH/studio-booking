@@ -7,6 +7,7 @@ import {
 } from "@/lib/google-sheet";
 import { createCalendarEvent, isSlotAvailable } from "@/lib/google-calendar";
 import { sendBookingConfirmation, sendInvoiceNotificationToAdmin } from "@/lib/email";
+import { sendBookingInvoiceToErp } from "@/lib/erp-invoice";
 import { STUDIOS, type StudioId } from "@/lib/studios";
 import { getSmallStudioOnlineBookingBlockMessage } from "@/lib/booking-rules";
 
@@ -183,6 +184,22 @@ export async function POST(request: NextRequest) {
         order.interviewGuests,
         eventId
       );
+    }
+
+    if (order.includeInvoice) {
+      await sendBookingInvoiceToErp({
+        orderId: merchantTradeNo,
+        buyerName: bookingFields.invoiceTitle,
+        buyerIdentifier: bookingFields.invoiceTaxId,
+        buyerEmail: bookingFields.invoiceRecipientEmail,
+        amountTaxIncluded: order.amount,
+        studioLabel: STUDIOS[order.studio as StudioId],
+        start: startIso,
+        end: endIso,
+        guestName: order.name,
+        paidHours: order.paidHours,
+        note: bookingFields.plainNote,
+      });
     }
 
     await markPendingOrderCompleted(merchantTradeNo);
