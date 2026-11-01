@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { format } from "date-fns";
 import { STUDIOS } from "@/lib/studios";
 import { zhTW } from "date-fns/locale";
@@ -101,6 +102,14 @@ export function BookingModal({
       setSelectedUsageMonth(null);
     }
   }, [discountInfo, start]);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
 
   const handleValidateDiscount = async () => {
     const code = discountCode.trim();
@@ -339,15 +348,11 @@ export function BookingModal({
     : `${RECORDING_HOURLY_RATE} 元／小時未稅 · 可使用優惠碼`;
   const activityPlanDetail = `${ACTIVITY_HOURLY_RATE} 元／小時未稅 · 不可使用優惠碼`;
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div
-        className="w-full max-h-[90vh] max-w-md overflow-y-auto rounded-t-2xl border border-slate-200 bg-white shadow-xl sm:rounded-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+      <div className="w-full max-h-[90vh] max-w-md overflow-y-auto rounded-t-2xl border border-slate-200 bg-white shadow-xl sm:rounded-2xl">
         <div className="border-b border-slate-200 px-6 py-4">
           <h3 className="text-lg font-semibold text-slate-800">
             立即預約 · {STUDIOS[studio]}
@@ -671,7 +676,8 @@ export function BookingModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

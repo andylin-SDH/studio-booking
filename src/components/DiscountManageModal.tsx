@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { STUDIOS, type StudioId } from "@/lib/studios";
@@ -48,6 +49,14 @@ export function DiscountManageModal({ onClose }: DiscountManageModalProps) {
       setSelectedUsageMonth(null);
     }
   }, [discountInfo]);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
 
   const handleValidateDiscount = async () => {
     const code = discountCode.trim();
@@ -141,15 +150,11 @@ export function DiscountManageModal({ onClose }: DiscountManageModalProps) {
       ? discountInfo.monthlyRemaining.find((m) => m.yearMonth === selectedUsageMonth) || null
       : null;
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div
-        className="w-full max-h-[90vh] max-w-md overflow-y-auto rounded-t-2xl border border-slate-200 bg-white shadow-xl sm:rounded-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+      <div className="w-full max-h-[90vh] max-w-md overflow-y-auto rounded-t-2xl border border-slate-200 bg-white shadow-xl sm:rounded-2xl">
         <div className="border-b border-slate-200 px-6 py-4">
           <h3 className="text-lg font-semibold text-slate-800">
             老師查詢／取消預約
@@ -277,7 +282,8 @@ export function DiscountManageModal({ onClose }: DiscountManageModalProps) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

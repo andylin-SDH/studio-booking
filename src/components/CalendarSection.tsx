@@ -180,6 +180,9 @@ export function CalendarSection({
       })),
     [events]
   );
+  const frozenRangesRef = useRef(eventRanges);
+  if (!preserveTimeSelection) frozenRangesRef.current = eventRanges;
+  const pickerRanges = preserveTimeSelection ? frozenRangesRef.current : eventRanges;
 
   /** 當日可預約總分鐘數（9:00–23:00） */
   const totalMinutesPerDay = (DAY_END_HOUR - DAY_START_HOUR) * 60;
@@ -211,14 +214,14 @@ export function CalendarSection({
 
   /** 檢查時段是否與任何已預約事件重疊（台北牆鐘） */
   const isSlotBusy = (slotStart: Date, slotEnd: Date) =>
-    eventRanges.some((range) => rangesOverlap(slotStart, slotEnd, range.start, range.end));
+    pickerRanges.some((range) => rangesOverlap(slotStart, slotEnd, range.start, range.end));
 
   /** 當日已預約區間（給使用者看，避免手機 select 看不出 disabled） */
   const bookedRangesOnSelectedDay = useMemo(() => {
     if (!selectedDate) return [] as { start: Date; end: Date; label: string }[];
     const dayStart = taipeiDateTimeFromGridDay(selectedDate, DAY_START_HOUR, 0);
     const dayEnd = taipeiDateTimeFromGridDay(selectedDate, DAY_END_HOUR, 0);
-    return eventRanges
+    return pickerRanges
       .filter((r) => rangesOverlap(r.start, r.end, dayStart, dayEnd))
       .map((r) => {
         const start = r.start < dayStart ? dayStart : r.start;
@@ -230,7 +233,7 @@ export function CalendarSection({
         };
       })
       .sort((a, b) => a.start.getTime() - b.start.getTime());
-  }, [selectedDate, eventRanges]);
+  }, [selectedDate, pickerRanges]);
 
   const timeOptions = useMemo(() => {
     const opts: string[] = [];
