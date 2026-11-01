@@ -39,7 +39,7 @@
 | `ECPAY_HASH_KEY` | 綠界 HashKey | `pwFHCqoQZGmho4w6`（測試） |
 | `ECPAY_HASH_IV` | 綠界 HashIV | `EkRm7iFT261dpevs`（測試） |
 | `ECPAY_SANDBOX` | 測試環境請設 `true` | `true` |
-| `PAYMENT_HOURLY_RATE` | 每小時金額（元） | `500` |
+| `PAYMENT_HOURLY_RATE` | 已不再決定金額。錄音 500、活動 700 寫在程式裡 | `500` |
 | `PAYMENT_INCLUDE_TAX` | 是否含 5% 稅 | `true` 或 `false` |
 
 ---

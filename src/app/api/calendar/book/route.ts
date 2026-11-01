@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createCalendarEvent, isSlotAvailable } from "@/lib/google-calendar";
-import {
-  getKolByCode,
-  getMonthlyUsage,
-  getTotalUsage,
-  addUsageRecord,
-} from "@/lib/google-sheet";
+import { addUsageRecord } from "@/lib/google-sheet";
 import { sendBookingConfirmation } from "@/lib/email";
 import { STUDIOS } from "@/lib/studios";
 import { getSmallStudioOnlineBookingBlockMessage } from "@/lib/booking-rules";
+import { parseBookingPlan, planNoteLine } from "@/lib/booking-pricing";
+import { quoteBooking } from "@/lib/booking-quote";
 
 export async function POST(request: NextRequest) {
   let body: {
@@ -20,6 +17,8 @@ export async function POST(request: NextRequest) {
     note?: string;
     interviewGuests?: string;
     discountCode?: string;
+    plan?: string;
+    activityTermsAccepted?: boolean;
     studio?: string;
     includeInvoice?: boolean;
     microphoneCount?: number;
@@ -40,6 +39,8 @@ export async function POST(request: NextRequest) {
     note,
     interviewGuests,
     discountCode,
+    plan: planRaw,
+    activityTermsAccepted,
     studio,
     includeInvoice,
     microphoneCount,
@@ -80,58 +81,32 @@ export async function POST(request: NextRequest) {
   }
   const durationMinutes = Math.round((endMs - startMs) / 60000);
   const durationHours = durationMinutes / 60;
+  const plan = parseBookingPlan(planRaw);
+  if (!plan) {
+    return NextResponse.json({ error: "請選擇使用方案" }, { status: 400 });
+  }
+  if (plan === "activity" && activityTermsAccepted !== true) {
+    return NextResponse.json({ error: "請先閱讀並勾選活動租借須知" }, { status: 400 });
+  }
 
-  // 若有折扣碼，驗證額度
-  if (discountCode?.trim()) {
-    try {
-      const kol = await getKolByCode(discountCode.trim());
-      if (!kol) {
-        return NextResponse.json(
-          { error: "折扣碼無效" },
-          { status: 400 }
-        );
-      }
-      const normalizedCode = discountCode.trim();
-      const hasOneTimeQuota =
-        typeof kol.oneTimeTotalHours === "number" && kol.oneTimeTotalHours > 0;
-      let remaining = 0;
-      let quotaLabel = "本月";
-      if (hasOneTimeQuota) {
-        const usedTotal = await getTotalUsage(normalizedCode);
-        remaining = kol.oneTimeTotalHours! - usedTotal;
-        quotaLabel = "總額度";
-      } else {
-        // 依預約的 start 日期取得「該月」額度（不是當月；避免 toISOString 時區轉換）
-        const yearMonth = start.slice(0, 7);
-        const usedThisMonth = await getMonthlyUsage(normalizedCode, yearMonth);
-        remaining = kol.hoursPerMonth - usedThisMonth;
-      }
-      const usableFree = Math.max(0, remaining); // 透支時不扣負數，僅付本次
-      if (usableFree < durationHours) {
-        const paidHours = durationHours - usableFree;
-        return NextResponse.json({
-          needPayment: true,
-          remainingHours: usableFree,
-          paidHours,
-          durationHours,
-          message: `${quotaLabel}剩餘 ${usableFree.toFixed(1)} 小時，本次 ${durationHours.toFixed(1)} 小時，超出 ${paidHours.toFixed(1)} 小時需付費`,
-        });
-      }
-    } catch (e) {
-      console.error("Discount check error:", e);
-      return NextResponse.json(
-        { error: "折扣碼驗證失敗" },
-        { status: 500 }
-      );
-    }
-  } else {
-    // 無折扣碼：一律經綠界付款
+  const quote = await quoteBooking({
+    start,
+    durationHours,
+    plan,
+    discountCode,
+  });
+  if (!quote.ok) {
+    return NextResponse.json({ error: quote.error }, { status: quote.status });
+  }
+  if (quote.paidHours > 0) {
     return NextResponse.json({
       needPayment: true,
-      remainingHours: 0,
-      paidHours: durationHours,
+      remainingHours: quote.freeHours,
+      paidHours: quote.paidHours,
       durationHours,
-      message: `本次預約 ${durationHours.toFixed(1)} 小時，請完成付款`,
+      hourlyRate: quote.hourlyRate,
+      plan,
+      message: quote.message,
     });
   }
 
@@ -148,9 +123,14 @@ export async function POST(request: NextRequest) {
     const roomLabel = studioId === "big" ? "大間" : "小間";
     const micLabel = `${microphoneCount} 支`;
     const summary = `[錄音室預約-${roomLabel}] ${name}${interviewGuests?.trim() ? ` 訪談：${interviewGuests.trim()}` : ""} ｜麥克風 ${micLabel}`;
-    const detailLines: string[] = [`聯絡方式：${contact}`, `麥克風數量：${micLabel}`];
+    const detailLines: string[] = [
+      `聯絡方式：${contact}`,
+      `麥克風數量：${micLabel}`,
+      planNoteLine(plan),
+    ];
+    if (plan === "activity") detailLines.push("活動租借須知：已閱讀");
     if (interviewGuests?.trim()) detailLines.push(`訪談來賓：${interviewGuests.trim()}`);
-    if (discountCode?.trim()) detailLines.push(`折扣碼：${discountCode.trim()}`);
+    if (quote.appliedDiscountCode) detailLines.push(`折扣碼：${quote.appliedDiscountCode}`);
     if (includeInvoice) {
       detailLines.push("需開立發票：是");
       if (invoiceTitle?.trim()) detailLines.push(`發票抬頭：${invoiceTitle.trim()}`);
@@ -168,10 +148,10 @@ export async function POST(request: NextRequest) {
     );
 
     // 若有折扣碼，寫入使用記錄（含大小間、訪談來賓、事件 ID）
-    if (discountCode?.trim()) {
+    if (quote.appliedDiscountCode) {
       const dateStr = new Date(start).toISOString().slice(0, 10);
       await addUsageRecord(
-        discountCode.trim(),
+        quote.appliedDiscountCode,
         dateStr,
         durationHours,
         `${name} ${dateStr}`,

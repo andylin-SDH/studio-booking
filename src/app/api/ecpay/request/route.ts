@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { buildEcpayForm } from "@/lib/ecpay";
 import { addPendingOrder } from "@/lib/google-sheet";
 import { getSmallStudioOnlineBookingBlockMessage } from "@/lib/booking-rules";
+import { chargeAmount, parseBookingPlan, planLabel, planNoteLine } from "@/lib/booking-pricing";
+import { quoteBooking } from "@/lib/booking-quote";
 import { isSlotAvailable } from "@/lib/google-calendar";
 
-/** 超出時數：每小時 500、每半小時 250（TWD） */
-const HOURLY_RATE =
-  parseFloat(process.env.PAYMENT_HOURLY_RATE || "500") || 500;
 /** 預設是否含稅（僅當前端未傳 includeTax 時使用） */
 const DEFAULT_INCLUDE_TAX = process.env.PAYMENT_INCLUDE_TAX === "true";
 
@@ -27,6 +26,8 @@ export async function POST(request: NextRequest) {
     note?: string;
     interviewGuests?: string;
     discountCode?: string;
+    plan?: string;
+    activityTermsAccepted?: boolean;
     studio?: string;
     paidHours?: number;
     includeTax?: boolean;
@@ -49,8 +50,10 @@ export async function POST(request: NextRequest) {
     note = "",
     interviewGuests = "",
     discountCode = "",
+    plan: planRaw,
+    activityTermsAccepted = false,
     studio = "big",
-    paidHours = 0,
+    paidHours: clientPaidHours = 0,
     includeTax = false,
     microphoneCount,
     invoiceTitle = "",
@@ -58,11 +61,18 @@ export async function POST(request: NextRequest) {
     invoiceRecipientEmail = "",
   } = body;
 
-  if (!start || !end || !name || !contact || paidHours <= 0 || !microphoneCount) {
+  if (!start || !end || !name || !contact || !microphoneCount) {
     return NextResponse.json(
-      { error: "請提供 start、end、name、contact、paidHours、microphoneCount" },
+      { error: "請提供 start、end、name、contact、microphoneCount" },
       { status: 400 }
     );
+  }
+  const plan = parseBookingPlan(planRaw);
+  if (!plan) {
+    return NextResponse.json({ error: "請選擇使用方案" }, { status: 400 });
+  }
+  if (plan === "activity" && activityTermsAccepted !== true) {
+    return NextResponse.json({ error: "請先閱讀並勾選活動租借須知" }, { status: 400 });
   }
   if (microphoneCount < 1 || microphoneCount > 4) {
     return NextResponse.json({ error: "需求麥克風數量需為 1~4" }, { status: 400 });
@@ -83,6 +93,9 @@ export async function POST(request: NextRequest) {
   const durationMinutes = Math.round(
     (new Date(end).getTime() - new Date(start).getTime()) / 60000
   );
+  if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+    return NextResponse.json({ error: "無效的 start/end 時間" }, { status: 400 });
+  }
 
   const studioId = (studio === "small" ? "small" : "big") as "big" | "small";
   const onlineBlock = getSmallStudioOnlineBookingBlockMessage(studioId, start);
@@ -104,11 +117,31 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "無法確認時段是否可約，請稍後再試" }, { status: 500 });
   }
 
-  const addTax = body.includeTax !== undefined ? body.includeTax : DEFAULT_INCLUDE_TAX;
-  let amount = Math.ceil(paidHours * HOURLY_RATE);
-  if (addTax) {
-    amount = Math.ceil(amount * 1.05);
+  const quote = await quoteBooking({
+    start,
+    durationHours: durationMinutes / 60,
+    plan,
+    discountCode,
+  });
+  if (!quote.ok) {
+    return NextResponse.json({ error: quote.error }, { status: quote.status });
   }
+  if (quote.paidHours <= 0) {
+    return NextResponse.json(
+      { error: "此預約無須另行付款，請重新送出" },
+      { status: 400 }
+    );
+  }
+  if (clientPaidHours > 0 && Math.abs(clientPaidHours - quote.paidHours) > 0.01) {
+    console.warn("[ECPay Request] 前端時數與伺服器不一致，改以伺服器為準", {
+      clientPaidHours,
+      paidHours: quote.paidHours,
+      plan,
+    });
+  }
+
+  const addTax = body.includeTax !== undefined ? body.includeTax : DEFAULT_INCLUDE_TAX;
+  const amount = chargeAmount(quote.paidHours, quote.hourlyRate, addTax);
   if (amount < 1) {
     return NextResponse.json({ error: "金額計算錯誤" }, { status: 400 });
   }
@@ -126,6 +159,8 @@ export async function POST(request: NextRequest) {
   const normalizedNote = note.trim();
   const mergedNote = [
     normalizedNote,
+    planNoteLine(plan),
+    plan === "activity" ? "活動租借須知：已閱讀" : "",
     `需求麥克風數量：${microphoneCount} 支`,
     includeTax ? `發票抬頭：${invoiceTitle.trim()}` : "",
     includeTax ? `統編：${invoiceTaxId.trim()}` : "",
@@ -143,9 +178,9 @@ export async function POST(request: NextRequest) {
       name: name.trim(),
       contact: contact.trim(),
       note: mergedNote,
-      discountCode: discountCode.trim(),
+      discountCode: quote.appliedDiscountCode,
       studio: studioId,
-      paidHours,
+      paidHours: quote.paidHours,
       amount,
       status: "pending",
       createdAt: new Date().toISOString(),
@@ -156,7 +191,7 @@ export async function POST(request: NextRequest) {
     const { formActionUrl, formData } = buildEcpayForm({
       orderId,
       amount,
-      productName: `盛德好錄音室 · ${paidHours.toFixed(1)} 小時${addTax ? "（含5%稅）" : ""}`,
+      productName: `盛德好錄音室 · ${planLabel(plan)} · ${quote.paidHours.toFixed(1)} 小時${addTax ? "（含5%稅）" : ""}`,
       returnUrl,
       orderResultUrl,
       clientBackUrl,

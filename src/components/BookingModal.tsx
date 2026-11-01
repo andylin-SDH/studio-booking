@@ -5,8 +5,14 @@ import { format } from "date-fns";
 import { STUDIOS } from "@/lib/studios";
 import { zhTW } from "date-fns/locale";
 import {
+  ACTIVITY_HOURLY_RATE,
+  RECORDING_HOURLY_RATE,
+  type BookingPlan,
+} from "@/lib/booking-pricing";
+import {
   BIG_STUDIO_WEEKEND_NOTICE,
   SMALL_STUDIO_WEEKEND_NOTICE_ONLY,
+  WEEKEND_BOOKING_NOTICE_TITLE,
   EVENING_BOOKING_NOTICE_TITLE,
   EVENING_BOOKING_NOTICE_BODY,
   getSmallStudioWeekendMode,
@@ -56,6 +62,7 @@ export function BookingModal({
 }: BookingModalProps) {
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
+  const [plan, setPlan] = useState<BookingPlan | null>(null);
   const [discountCode, setDiscountCode] = useState("");
   const [discountInfo, setDiscountInfo] = useState<DiscountInfo>(null);
   const [validating, setValidating] = useState(false);
@@ -70,10 +77,14 @@ export function BookingModal({
   const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
   const [selectedUsageMonth, setSelectedUsageMonth] = useState<string | null>(null);
   const [cancelingEventId, setCancelingEventId] = useState<string | null>(null);
+  const [activityTermsAccepted, setActivityTermsAccepted] = useState(false);
 
   const durationHours = durationMinutes / 60;
 
   const isWeekendSlot = isWeekendTaipei(start);
+  const discountAllowed = plan === "record" && !isWeekendSlot;
+  const hourlyRate =
+    plan === "activity" ? ACTIVITY_HOURLY_RATE : plan === "record" ? RECORDING_HOURLY_RATE : null;
   const showBigWeekendNotice = studio === "big" && isWeekendSlot;
   const showSmallWeekendNoticeOnly =
     studio === "small" && isWeekendSlot && getSmallStudioWeekendMode() === "notice_only";
@@ -173,6 +184,14 @@ export function BookingModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (plan !== "record" && plan !== "activity") {
+      setMessage({ type: "error", text: "請選擇使用方案" });
+      return;
+    }
+    if (plan === "activity" && !activityTermsAccepted) {
+      setMessage({ type: "error", text: "請先閱讀並勾選活動租借須知" });
+      return;
+    }
     if (!name.trim() || !contact.trim()) {
       setMessage({ type: "error", text: "請填寫姓名與 Email" });
       return;
@@ -200,7 +219,8 @@ export function BookingModal({
         return;
       }
     }
-    if (discountCode.trim() && discountInfo && !discountInfo.valid) {
+    const appliedDiscountCode = discountAllowed ? discountCode.trim() : "";
+    if (appliedDiscountCode && discountInfo && !discountInfo.valid) {
       setMessage({ type: "error", text: "請使用有效的折扣碼" });
       return;
     }
@@ -218,7 +238,9 @@ export function BookingModal({
           contact: contact.trim(),
           note: note.trim(),
           interviewGuests: interviewGuests.trim() || undefined,
-          discountCode: discountCode.trim() || undefined,
+          discountCode: appliedDiscountCode || undefined,
+          plan,
+          activityTermsAccepted: plan === "activity" ? true : undefined,
           studio,
           includeInvoice,
           microphoneCount: Number(microphoneCount),
@@ -242,7 +264,9 @@ export function BookingModal({
             contact: contact.trim(),
             note: note.trim(),
             interviewGuests: interviewGuests.trim() || undefined,
-            discountCode: discountCode.trim() || undefined,
+            discountCode: appliedDiscountCode || undefined,
+            plan,
+            activityTermsAccepted: plan === "activity" ? true : undefined,
             studio,
             paidHours: data.paidHours,
             includeTax: includeInvoice,
@@ -299,6 +323,21 @@ export function BookingModal({
     discountInfo && discountInfo.valid && selectedUsageMonth
       ? discountInfo.monthlyRemaining.find((m) => m.yearMonth === selectedUsageMonth) || null
       : null;
+  const bookingMonthMeta =
+    discountAllowed && discountInfo && discountInfo.valid
+      ? discountInfo.monthlyRemaining.find((m) => m.yearMonth === format(start, "yyyy-MM")) || null
+      : null;
+  const freeHoursEstimate =
+    bookingMonthMeta != null ? Math.min(durationHours, Math.max(0, bookingMonthMeta.remaining)) : 0;
+  const paidHoursEstimate = hourlyRate == null ? durationHours : durationHours - freeHoursEstimate;
+  const untaxedEstimate =
+    hourlyRate == null ? null : Math.ceil(paidHoursEstimate * hourlyRate);
+  const payableEstimate =
+    untaxedEstimate == null ? null : includeInvoice ? Math.ceil(untaxedEstimate * 1.05) : untaxedEstimate;
+  const recordPlanDetail = isWeekendSlot
+    ? `${RECORDING_HOURLY_RATE} 元／小時未稅 · 週末不可使用優惠碼`
+    : `${RECORDING_HOURLY_RATE} 元／小時未稅 · 可使用優惠碼`;
+  const activityPlanDetail = `${ACTIVITY_HOURLY_RATE} 元／小時未稅 · 不可使用優惠碼`;
 
   return (
     <div
@@ -320,10 +359,11 @@ export function BookingModal({
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {(showBigWeekendNotice || showSmallWeekendNoticeOnly) && (
-            <WeekendProminentAlert title="週末預約 · 請先看這裡">
-              {showBigWeekendNotice
-                ? BIG_STUDIO_WEEKEND_NOTICE
-                : SMALL_STUDIO_WEEKEND_NOTICE_ONLY}
+            <WeekendProminentAlert title={WEEKEND_BOOKING_NOTICE_TITLE}>
+              <p>{BIG_STUDIO_WEEKEND_NOTICE}</p>
+              {showSmallWeekendNoticeOnly ? (
+                <p className="mt-1">{SMALL_STUDIO_WEEKEND_NOTICE_ONLY}</p>
+              ) : null}
             </WeekendProminentAlert>
           )}
           {showEveningNotice && (
@@ -331,6 +371,41 @@ export function BookingModal({
               {EVENING_BOOKING_NOTICE_BODY}
             </WeekendProminentAlert>
           )}
+          <div>
+            <p className="text-sm font-medium text-slate-700">使用方案 *</p>
+            <div className="mt-1 space-y-2">
+              <button
+                type="button"
+                onClick={() => setPlan("record")}
+                className={`w-full rounded-lg border px-3 py-2 text-left ${
+                  plan === "record"
+                    ? "border-sky-600 bg-sky-50"
+                    : "border-slate-300 bg-white hover:bg-slate-50"
+                }`}
+              >
+                <span className="block text-sm font-medium text-slate-800">五人以下（僅限錄音使用）</span>
+                <span className="mt-0.5 block text-xs text-slate-600">{recordPlanDetail}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPlan("activity")}
+                className={`w-full rounded-lg border px-3 py-2 text-left ${
+                  plan === "activity"
+                    ? "border-sky-600 bg-sky-50"
+                    : "border-slate-300 bg-white hover:bg-slate-50"
+                }`}
+              >
+                <span className="block text-sm font-medium text-slate-800">6人起（活動，講座等）</span>
+                <span className="mt-0.5 block text-xs text-slate-600">{activityPlanDetail}</span>
+              </button>
+            </div>
+            {plan === "activity" && (
+              <ActivityRentalTerms
+                accepted={activityTermsAccepted}
+                onAcceptedChange={setActivityTermsAccepted}
+              />
+            )}
+          </div>
           <div>
             <label className="block text-sm font-medium text-slate-700">姓名 *</label>
             <input
@@ -426,7 +501,8 @@ export function BookingModal({
                     </span>{" "}
                     · 已用 {selectedMonthMeta.used.toFixed(1)}h / 每月{" "}
                     {discountInfo.hoursPerMonth.toFixed(1)}h
-                    {selectedMonthMeta.yearMonth === format(start, "yyyy-MM") &&
+                    {discountAllowed &&
+                      selectedMonthMeta.yearMonth === format(start, "yyyy-MM") &&
                       selectedMonthMeta.remaining < durationHours && (
                         <span className="ml-1 text-amber-600">
                           （本次超出部分將以綠界金流付費）
@@ -470,7 +546,31 @@ export function BookingModal({
             {discountInfo && !discountInfo.valid && (
               <p className="mt-2 text-sm text-amber-600">{discountInfo.error}</p>
             )}
+            {plan && !discountAllowed && (
+              <p className="mt-2 text-sm text-slate-600">
+                {isWeekendSlot
+                  ? "這次是週末預約，折扣碼不能抵時數。查詢與取消仍可使用。"
+                  : "活動方案不能用折扣碼抵時數。查詢與取消仍可使用。"}
+              </p>
+            )}
           </div>
+          {payableEstimate != null && hourlyRate != null && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              <div className="flex items-center justify-between gap-3">
+                <span>
+                  應付 {paidHoursEstimate.toFixed(1)} 小時 × {hourlyRate}
+                </span>
+                <span className="font-semibold text-slate-900">
+                  {payableEstimate.toLocaleString("zh-TW")} 元{includeInvoice ? "（含稅）" : "未稅"}
+                </span>
+              </div>
+              {freeHoursEstimate > 0 && (
+                <p className="mt-1 text-xs text-slate-500">
+                  另 {freeHoursEstimate.toFixed(1)} 小時由優惠碼抵扣，送出時以系統計算為準。
+                </p>
+              )}
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -559,14 +659,86 @@ export function BookingModal({
             </button>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || (plan === "activity" && !activityTermsAccepted)}
               className="flex-1 rounded-lg bg-sky-600 px-4 py-2 font-medium text-white hover:bg-sky-700 disabled:opacity-50"
             >
-              {submitting ? "送出中…" : "送出預約"}
+              {submitting
+                ? "送出中…"
+                : payableEstimate != null && paidHoursEstimate > 0
+                  ? "前往付款"
+                  : "送出預約"}
             </button>
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+function ActivityRentalTerms({
+  accepted,
+  onAcceptedChange,
+}: {
+  accepted: boolean;
+  onAcceptedChange: (accepted: boolean) => void;
+}) {
+  return (
+    <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50">
+      <div className="border-b border-amber-200 px-3 py-2">
+        <p className="text-sm font-semibold text-slate-900">活動租借須知</p>
+        <p className="mt-0.5 text-xs text-slate-600">請閱讀後勾選，才能租借活動場。</p>
+      </div>
+      <ol className="space-y-3 px-3 py-3 text-sm leading-relaxed text-slate-800">
+        <li className="flex gap-2">
+          <span className="font-semibold">1.</span>
+          <span>
+            租賃空間請配合準時離場，進撤場時間為前後10分鐘，超時以30分鐘為單位計費，如需長時間場佈，請為自己多預留時間。
+          </span>
+        </li>
+        <li className="flex gap-2">
+          <span className="font-semibold">2.</span>
+          <span>
+            如因故必須取消原使用時段，提早14天以上取消退訂100%，提早3天以上取消退訂50%，3日內取消恕不退款。如需改期，以一次為限。
+            請聯繫：
+            <a className="text-sky-700 underline" href="mailto:sandehao@gmail.com">
+              sandehao@gmail.com
+            </a>
+            {" "}
+            或致電：
+            <a className="text-sky-700 underline" href="tel:0933105070">
+              0933105070
+            </a>
+          </span>
+        </li>
+        <li className="flex gap-2">
+          <span className="font-semibold">3.</span>
+          <span>
+            離場時，請關閉所有電源（冷氣、電燈、音響、投影設備等），恢復原擺設並將垃圾帶至B1垃圾場，或加購清運1袋垃圾100元新台幣，如需使用餐食則需加收1000元清潔費。
+            離場最後由場地管理人員陪同檢查完成。
+          </span>
+        </li>
+        <li className="flex gap-2">
+          <span className="font-semibold">4.</span>
+          <span>
+            場地租借包含投影機，音響，2支無線麥克風，30張折疊椅，10張長桌。
+          </span>
+        </li>
+        <li className="flex gap-2">
+          <span className="font-semibold">5.</span>
+          <span>
+            活動使用僅限拍攝，講座，讀書會等靜態活動，謝絕生日派對等可能毀壞場地之活動。
+          </span>
+        </li>
+      </ol>
+      <label className="flex cursor-pointer items-start gap-2 border-t border-amber-200 px-3 py-3">
+        <input
+          type="checkbox"
+          checked={accepted}
+          onChange={(e) => onAcceptedChange(e.target.checked)}
+          className="mt-0.5 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+        />
+        <span className="text-sm font-medium text-slate-900">我已閱讀活動租借須知</span>
+      </label>
     </div>
   );
 }

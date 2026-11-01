@@ -10,12 +10,15 @@ import { sendBookingConfirmation, sendInvoiceNotificationToAdmin } from "@/lib/e
 import { sendBookingInvoiceToErp } from "@/lib/erp-invoice";
 import { STUDIOS, type StudioId } from "@/lib/studios";
 import { getSmallStudioOnlineBookingBlockMessage } from "@/lib/booking-rules";
+import { canUseDiscountCode, planFromLabel } from "@/lib/booking-pricing";
 
 function extractBookingFields(note?: string): {
   microphoneCount?: number;
   invoiceTitle?: string;
   invoiceTaxId?: string;
   invoiceRecipientEmail?: string;
+  planLabel?: string;
+  activityTermsAccepted?: boolean;
   plainNote?: string;
 } {
   if (!note) return { plainNote: "" };
@@ -28,6 +31,8 @@ function extractBookingFields(note?: string): {
   let invoiceTitle: string | undefined;
   let invoiceTaxId: string | undefined;
   let invoiceRecipientEmail: string | undefined;
+  let planLabel: string | undefined;
+  let activityTermsAccepted = false;
   const plainLines: string[] = [];
 
   for (const line of lines) {
@@ -48,6 +53,14 @@ function extractBookingFields(note?: string): {
       invoiceRecipientEmail = line.replace("發票收件 Email：", "").trim();
       continue;
     }
+    if (line.startsWith("使用方案：")) {
+      planLabel = line.replace("使用方案：", "").trim();
+      continue;
+    }
+    if (line.startsWith("活動租借須知：")) {
+      activityTermsAccepted = true;
+      continue;
+    }
     plainLines.push(line);
   }
 
@@ -56,6 +69,8 @@ function extractBookingFields(note?: string): {
     invoiceTitle,
     invoiceTaxId,
     invoiceRecipientEmail,
+    planLabel,
+    activityTermsAccepted,
     plainNote: plainLines.join("\n"),
   };
 }
@@ -112,9 +127,17 @@ export async function POST(request: NextRequest) {
       ? `${bookingFields.microphoneCount} 支`
       : "未填";
     const summary = `[錄音室預約-付費-${roomLabel}] ${order.name}${order.interviewGuests?.trim() ? ` 訪談：${order.interviewGuests.trim()}` : ""} ｜麥克風 ${micLabel}`;
+    const bookedPlan = planFromLabel(bookingFields.planLabel);
+    const discountApplies =
+      Boolean(order.discountCode?.trim()) &&
+      (bookedPlan ? canUseDiscountCode(bookedPlan, order.start) : true);
     const detailLines: string[] = [`聯絡方式：${order.contact}`, `麥克風數量：${micLabel}`];
+    if (bookingFields.planLabel) detailLines.push(`使用方案：${bookingFields.planLabel}`);
+    if (bookingFields.activityTermsAccepted) detailLines.push("活動租借須知：已閱讀");
     if (order.interviewGuests?.trim()) detailLines.push(`訪談來賓：${order.interviewGuests.trim()}`);
-    if (order.discountCode?.trim()) detailLines.push(`折扣碼：${order.discountCode.trim()}`);
+    if (discountApplies && order.discountCode?.trim()) {
+      detailLines.push(`折扣碼：${order.discountCode.trim()}`);
+    }
     detailLines.push(`付費超出：${order.paidHours} 小時`);
     if (order.includeInvoice) {
       detailLines.push("需開立發票：是");
@@ -174,7 +197,7 @@ export async function POST(request: NextRequest) {
     const durationHours = order.durationMinutes / 60;
     const dateStr = startIso.slice(0, 10);
 
-    if (order.discountCode) {
+    if (discountApplies && order.discountCode) {
       await addUsageRecord(
         order.discountCode,
         dateStr,
@@ -198,7 +221,7 @@ export async function POST(request: NextRequest) {
         end: endIso,
         guestName: order.name,
         paidHours: order.paidHours,
-        note: bookingFields.plainNote,
+        note: [bookingFields.planLabel, bookingFields.plainNote].filter(Boolean).join(" "),
       });
     }
 
@@ -222,7 +245,7 @@ export async function POST(request: NextRequest) {
         studio: order.studio as StudioId,
         studioLabel: STUDIOS[order.studio as StudioId],
         amount: order.amount,
-        note: bookingFields.plainNote,
+        note: [bookingFields.planLabel, bookingFields.plainNote].filter(Boolean).join("\n"),
         invoiceTitle: bookingFields.invoiceTitle,
         invoiceTaxId: bookingFields.invoiceTaxId,
         invoiceRecipientEmail: bookingFields.invoiceRecipientEmail,

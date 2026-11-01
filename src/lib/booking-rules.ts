@@ -1,8 +1,9 @@
 import type { StudioId } from "@/lib/studios";
 
-/** 大間：週末仍可預約，僅前端顯示警示（見 BookingModal） */
+/** 週末仍可預約時，表單上方的提示（大間，以及小間改為僅警示時） */
 export const BIG_STUDIO_WEEKEND_NOTICE =
-  "因週末無工作人員固定上班，如需預約假日大間空間，請聯繫經紀人取得自助入場方式。";
+  "因無夥伴固定上班，需派人員支援，不適用優惠碼。";
+export const WEEKEND_BOOKING_NOTICE_TITLE = "週末預約";
 
 /** 小間：週末不開放線上預約時，阻擋預約並顯示此文案（聯繫句亦單獨用於行事曆精簡列） */
 export const SMALL_STUDIO_WEEKEND_CONTACT_LINE =
