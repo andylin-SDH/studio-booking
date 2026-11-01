@@ -212,6 +212,7 @@ export default function Home() {
               onSelectDate={setSelectedDate}
               onSelectSlot={handleSelectSlot}
               onOpenDiscountManage={() => setShowDiscountModal(true)}
+              preserveTimeSelection={showBookingModal}
             />
           </div>
         </section>

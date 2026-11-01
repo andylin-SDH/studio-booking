@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   format,
   startOfMonth,
@@ -58,6 +58,8 @@ interface CalendarSectionProps {
   onSelectDate: (date: Date | null) => void;
   onSelectSlot: (start: Date, end: Date) => void;
   onOpenDiscountManage?: () => void;
+  /** 預約表單開著時，重抓只更新已約時段，不清掉已選時間 */
+  preserveTimeSelection?: boolean;
 }
 
 export function CalendarSection({
@@ -66,12 +68,17 @@ export function CalendarSection({
   onSelectDate,
   onSelectSlot,
   onOpenDiscountManage,
+  preserveTimeSelection = false,
 }: CalendarSectionProps) {
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [eventsQuery, setEventsQuery] = useState<{ key: string; events: CalendarEvent[] }>({
+    key: "",
+    events: [],
+  });
+  const [error, setError] = useState<{ key: string; message: string } | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const fetchGen = useRef(0);
+  const appliedKeyRef = useRef("");
 
   // 預約成功後重新載入行事曆，避免同一時段重複預約
   useEffect(() => {
@@ -80,7 +87,7 @@ export function CalendarSection({
     return () => window.removeEventListener("booking-success", onBookingSuccess);
   }, []);
 
-  // 頁面停留時定期刷新（手機長開頁最容易看到「明明已約卻還可選」）
+  // 頁面停留時定期刷新。表單開著也照樣抓，只更新已約時段。
   useEffect(() => {
     const id = window.setInterval(() => setRefreshTrigger((n) => n + 1), EVENTS_REFRESH_MS);
     const onVis = () => {
@@ -111,14 +118,18 @@ export function CalendarSection({
 
   // 取得當月行事曆事件（使用穩定字串避免重複請求）
   const monthKey = format(currentMonth, "yyyy-MM");
+  const queryKey = `${studio}:${monthKey}`;
+  const eventsReady = eventsQuery.key === queryKey;
+  const events = eventsReady ? eventsQuery.events : [];
+  const visibleError = error?.key === queryKey ? error.message : null;
   useEffect(() => {
-    let cancelled = false;
+    const gen = ++fetchGen.current;
+    const controller = new AbortController();
     const from = format(monthStart, "yyyy-MM-dd");
     const to = format(addDays(monthEnd, 1), "yyyy-MM-dd");
-    setLoading(true);
-    setError(null);
     fetch(`/api/calendar/events?from=${from}&to=${to}&studio=${studio}`, {
       cache: "no-store",
+      signal: controller.signal,
     })
       .then(async (res) => {
         const data = (await res.json()) as {
@@ -131,16 +142,21 @@ export function CalendarSection({
         return data;
       })
       .then((data) => {
-        if (!cancelled) setEvents(data.events || []);
+        // 較慢的舊請求不准覆蓋已經回來的新資料，也不准把別的月份畫上來
+        if (gen !== fetchGen.current) return;
+        appliedKeyRef.current = queryKey;
+        setEventsQuery({ key: queryKey, events: data.events || [] });
+        setError(null);
       })
-      .catch((e) => {
-        if (!cancelled) setError(e.message);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+      .catch((e: unknown) => {
+        if (controller.signal.aborted || gen !== fetchGen.current) return;
+        // 這個月份已經有資料時，背景重抓失敗就留著原畫面
+        if (appliedKeyRef.current === queryKey) return;
+        const message = e instanceof Error ? e.message : "無法載入行事曆";
+        setError({ key: queryKey, message });
       });
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [monthKey, studio, refreshTrigger]); // 切換月份、錄音室或預約成功後重新取得
 
@@ -228,9 +244,9 @@ export function CalendarSection({
   const [startTime, setStartTime] = useState<string>("");
   const [endTime, setEndTime] = useState<string>("");
 
-  // 刷新後若已選時段變成忙碌，清掉避免手機殘留舊值
+  // 表單開著時不改已選時間。表單關掉後，若這段已經被約走才清掉。
   useEffect(() => {
-    if (!selectedDate || !startTime) return;
+    if (preserveTimeSelection || !eventsReady || !selectedDate || !startTime) return;
     const [sh, sm] = startTime.split(":").map(Number);
     const start = taipeiDateTimeFromGridDay(selectedDate, sh, sm);
     const probeEnd = new Date(start.getTime() + 30 * 60 * 1000);
@@ -243,7 +259,7 @@ export function CalendarSection({
     const [eh, em] = endTime.split(":").map(Number);
     const end = taipeiDateTimeFromGridDay(selectedDate, eh, em);
     if (isSlotBusy(start, end)) setEndTime("");
-  }, [selectedDate, startTime, endTime, eventRanges]);
+  }, [preserveTimeSelection, eventsReady, selectedDate, startTime, endTime, eventRanges]);
 
   const handleStartChange = (val: string) => {
     setStartTime(val);
@@ -268,11 +284,11 @@ export function CalendarSection({
     onSelectDate(null);
   }, [studio]);
 
-  if (error) {
+  if (visibleError && !eventsReady) {
     return (
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-amber-800">
         <p className="font-medium">無法載入行事曆</p>
-        <p className="mt-1 text-sm">{error}</p>
+        <p className="mt-1 text-sm">{visibleError}</p>
         <p className="mt-2 text-sm">
           請確認已設定 Google 行事曆 API（見 README），或先選擇日期與時段進行預約。
         </p>
@@ -455,7 +471,7 @@ export function CalendarSection({
           <h3 className="mb-4 font-semibold text-slate-800">
             {format(selectedDate, "yyyy年M月d日 (EEEE)", { locale: zhTW })} — 選擇時段
           </h3>
-          {loading ? (
+          {!eventsReady ? (
             <p className="text-slate-500">載入中…</p>
           ) : (
             <div className="space-y-4">
@@ -485,7 +501,7 @@ export function CalendarSection({
                       const eveningBlockedSmall =
                         studio === "small" && isEveningBookingStartTaipei(slotStart);
                       // 手機 Safari 常忽略 option disabled：已預約／不開放直接不列入可選
-                      if (busy || eveningBlockedSmall) return [];
+                      if ((busy || eveningBlockedSmall) && !(preserveTimeSelection && t === startTime)) return [];
                       return [
                         <option key={t} value={t} disabled={past}>
                           {t}
@@ -514,7 +530,7 @@ export function CalendarSection({
                         const slotStart = taipeiDateTimeFromGridDay(selectedDate, sh, sm);
                         const slotEnd = taipeiDateTimeFromGridDay(selectedDate, h, m);
                         // 與已預約重疊的結束時間不列（手機不可靠 disabled）
-                        return !isSlotBusy(slotStart, slotEnd);
+                        return !isSlotBusy(slotStart, slotEnd) || (preserveTimeSelection && t === endTime);
                       })
                       .map((t) => {
                         const [h, m] = t.split(":").map(Number);
